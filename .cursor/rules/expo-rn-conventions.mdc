@@ -1,0 +1,58 @@
+---
+description: Expo React Native 코드 규칙 — deprecated API 사용 금지, 최신 API 패턴 적용
+globs: "**/*.{tsx,ts}"
+alwaysApply: false
+---
+
+# Expo React Native Conventions
+
+## SafeAreaView
+
+`react-native` 내장 `SafeAreaView`는 deprecated. 반드시 `react-native-safe-area-context` 사용.
+
+```tsx
+// BAD
+import { SafeAreaView } from "react-native";
+
+// GOOD
+import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
+// 루트에 <SafeAreaProvider> 필수
+```
+
+## expo-file-system
+
+레거시 API(`getInfoAsync`, `makeDirectoryAsync`, `createDownloadResumable`) 사용 금지.
+새 `File`, `Directory`, `Paths` 클래스를 사용.
+
+```tsx
+// BAD
+import * as FileSystem from "expo-file-system/legacy";
+await FileSystem.getInfoAsync(path);
+
+// GOOD
+import { File, Directory, Paths } from "expo-file-system";
+const dir = new Directory(Paths.document, "models");
+if (!dir.exists) dir.create();
+const file = new File(dir, "model.gguf");
+if (file.exists) { /* ... */ }
+await File.downloadFileAsync(url, dir);
+```
+
+## Image resizeMode
+
+`Image`의 `resizeMode`는 style이 아니라 prop으로 전달.
+
+```tsx
+// BAD
+<Image style={{ resizeMode: "cover" }} />
+
+// GOOD
+<Image resizeMode="cover" style={styles.image} />
+```
+
+## llama.rn (on-device LLM)
+
+- 시뮬레이터: `n_gpu_layers: 0`, `use_gpu: false` (Metal 에뮬레이션 크래시 방지)
+- 실기기: `n_gpu_layers: 99`, `use_gpu: true`
+- 멀티모달 모델은 반드시 `ctx_shift: false`
+- `useEffect` cleanup에서 `context.release()` 후 ref를 `null`로 리셋
