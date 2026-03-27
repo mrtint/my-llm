@@ -6,13 +6,18 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "이미지를 선택하여 AI에게 질문할 수 있습니다."
+      },
+      "bundleIdentifier": "com.mrtint.myllm"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +26,25 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.mrtint.myllm"
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "targetSdkVersion": 34,
+            "extraMavenRepos": [
+              "https://jitpack.io"
+            ]
+          },
+          "ios": {
+            "deploymentTarget": "16.0"
+          }
+        }
+      ],
+      "llama.rn"
+    ]
   }
 }

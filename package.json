@@ -4,15 +4,21 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
     "expo": "~55.0.8",
+    "expo-build-properties": "~55.0.10",
+    "expo-dev-client": "~55.0.18",
+    "expo-file-system": "~55.0.11",
+    "expo-image-picker": "~55.0.13",
     "expo-status-bar": "~55.0.4",
+    "llama.rn": "^0.12.0-rc.1",
     "react": "19.2.0",
-    "react-native": "0.83.2"
+    "react-native": "0.83.2",
+    "react-native-safe-area-context": "~5.6.2"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
