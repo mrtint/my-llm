@@ -36,6 +36,12 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# model files
+/models
+
+# inference results
+/scripts/results
+
 # generated native folders
 /ios
 /android
