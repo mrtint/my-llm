@@ -43,7 +43,9 @@ const STRINGS = {
     modelName: "InternVL2.5-4B (Q4_K_M)",
     totalDownload: "총 다운로드",
     downloadBtn: "모델 다운로드",
-    tapToSelect: "이미지를 탭하여 선택",
+    tapToSelect: "탭하여 이미지 추가",
+    imageCount: (n: number) => `이미지 ${n}장 선택됨`,
+    removeImage: "삭제",
     promptPlaceholder: "이미지에 대해 질문하세요...",
     defaultPrompt: "이 이미지에서 무엇이 보이나요?",
     askAI: "AI에게 묻기",
@@ -60,6 +62,7 @@ const STRINGS = {
     errorSelectImage: "먼저 이미지를 선택해주세요",
     errorModelLoad: "모델 로드 오류",
     errorInference: "추론 오류",
+    errorEmptyResponse: "모델이 빈 응답을 반환했습니다. 콘솔 로그를 확인해주세요.",
     errorDownload: "다운로드 실패",
   },
   ja: {
@@ -69,7 +72,9 @@ const STRINGS = {
     modelName: "InternVL2.5-4B (Q4_K_M)",
     totalDownload: "合計ダウンロード",
     downloadBtn: "モデルをダウンロード",
-    tapToSelect: "タップして画像を選択",
+    tapToSelect: "タップして画像を追加",
+    imageCount: (n: number) => `画像${n}枚選択済み`,
+    removeImage: "削除",
     promptPlaceholder: "画像について質問してください...",
     defaultPrompt: "この画像には何が見えますか？",
     askAI: "AIに聞く",
@@ -86,6 +91,7 @@ const STRINGS = {
     errorSelectImage: "最初に画像を選択してください",
     errorModelLoad: "モデル読み込みエラー",
     errorInference: "推論エラー",
+    errorEmptyResponse: "モデルが空の応答を返しました。コンソールログを確認してください。",
     errorDownload: "ダウンロード失敗",
   },
   zh: {
@@ -95,7 +101,9 @@ const STRINGS = {
     modelName: "InternVL2.5-4B (Q4_K_M)",
     totalDownload: "总下载量",
     downloadBtn: "下载模型",
-    tapToSelect: "点击选择图片",
+    tapToSelect: "点击添加图片",
+    imageCount: (n: number) => `已选择${n}张图片`,
+    removeImage: "删除",
     promptPlaceholder: "询问关于图片的问题...",
     defaultPrompt: "这张图片里有什么？",
     askAI: "询问AI",
@@ -112,6 +120,7 @@ const STRINGS = {
     errorSelectImage: "请先选择图片",
     errorModelLoad: "模型加载错误",
     errorInference: "推理错误",
+    errorEmptyResponse: "模型返回了空回复，请检查控制台日志。",
     errorDownload: "下载失败",
   },
   en: {
@@ -121,7 +130,9 @@ const STRINGS = {
     modelName: "InternVL2.5-4B (Q4_K_M)",
     totalDownload: "Total download",
     downloadBtn: "Download Model",
-    tapToSelect: "Tap to select image",
+    tapToSelect: "Tap to add image",
+    imageCount: (n: number) => `${n} image${n > 1 ? "s" : ""} selected`,
+    removeImage: "Remove",
     promptPlaceholder: "Ask about the image...",
     defaultPrompt: "What do you see in this image?",
     askAI: "Ask AI",
@@ -138,6 +149,7 @@ const STRINGS = {
     errorSelectImage: "Please select an image first",
     errorModelLoad: "Model Load Error",
     errorInference: "Inference Error",
+    errorEmptyResponse: "Model returned an empty response. Check console logs for details.",
     errorDownload: "Download failed",
   },
 } as const;
@@ -178,7 +190,7 @@ function AppContent() {
   const [downloadStatus, setDownloadStatus] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageUris, setImageUris] = useState<string[]>([]);
   const [prompt, setPrompt] = useState<string>(t.defaultPrompt);
   const [response, setResponse] = useState("");
   const [elapsedTime, setElapsedTime] = useState<string | null>(null);
@@ -197,6 +209,17 @@ function AppContent() {
     };
   }, []);
 
+  const cleanupOldModels = () => {
+    if (!MODEL_DIR.exists) return;
+    const currentNames = new Set([MODEL_FILES.text.name, MODEL_FILES.mmproj.name]);
+    for (const entry of MODEL_DIR.list()) {
+      if (entry instanceof File && entry.name.endsWith(".gguf") && !currentNames.has(entry.name)) {
+        console.log("Removing old model:", entry.name);
+        entry.delete();
+      }
+    }
+  };
+
   const checkModels = () => {
     setModelState("checking");
     try {
@@ -204,6 +227,7 @@ function AppContent() {
         setModelState("not_downloaded");
         return;
       }
+      cleanupOldModels();
       const textFile = new File(MODEL_DIR, MODEL_FILES.text.name);
       const mmprojFile = new File(MODEL_DIR, MODEL_FILES.mmproj.name);
       if (textFile.exists && mmprojFile.exists) {
@@ -223,6 +247,8 @@ function AppContent() {
       if (!MODEL_DIR.exists) {
         MODEL_DIR.create();
       }
+
+      cleanupOldModels();
 
       const files = [MODEL_FILES.mmproj, MODEL_FILES.text];
       for (let i = 0; i < files.length; i++) {
@@ -266,6 +292,7 @@ function AppContent() {
       const mmOk = await context.initMultimodal({
         path: mmprojFile.uri,
         use_gpu: false,
+        image_max_tokens: 512,
       });
 
       if (!mmOk) {
@@ -293,11 +320,19 @@ function AppContent() {
       mediaTypes: ["images"],
       quality: 0.7,
       allowsEditing: false,
+      allowsMultipleSelection: true,
     });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+    if (!result.canceled && result.assets.length > 0) {
+      setImageUris((prev) => [
+        ...prev,
+        ...result.assets.map((a) => a.uri),
+      ]);
       setResponse("");
     }
+  };
+
+  const removeImage = (index: number) => {
+    setImageUris((prev) => prev.filter((_, i) => i !== index));
   };
 
   const runInference = async () => {
@@ -308,7 +343,7 @@ function AppContent() {
       Alert.alert(t.errorTitle, t.errorModelNotLoaded);
       return;
     }
-    if (!imageUri) {
+    if (imageUris.length === 0) {
       Alert.alert(t.errorTitle, t.errorSelectImage);
       return;
     }
@@ -340,16 +375,17 @@ function AppContent() {
               role: "user",
               content: [
                 { type: "text", text: prompt },
-                {
-                  type: "image_url",
-                  image_url: { url: imageUri },
-                },
+                ...imageUris.map((uri) => ({
+                  type: "image_url" as const,
+                  image_url: { url: uri },
+                })),
               ],
             },
           ],
-          n_predict: 512,
+          n_predict: 1024,
           temperature: 0.2,
           stop: ["<|im_end|>", "</s>"],
+          enable_thinking: false,
         },
         (data) => {
           if (data.token) {
@@ -368,7 +404,14 @@ function AppContent() {
       console.log("Completion stats:", {
         tokens: result.tokens_predicted,
         speed: result.timings?.predicted_per_second?.toFixed(1) + " t/s",
+        stopped_eos: result.stopped_eos,
+        stopped_word: result.stopped_word,
+        stopping_word: result.stopping_word,
+        truncated: result.truncated,
       });
+      if (result.tokens_predicted === 0) {
+        Alert.alert(t.errorTitle, t.errorEmptyResponse);
+      }
     } catch (e: any) {
       console.error("Inference error:", e);
       Alert.alert(
@@ -430,24 +473,41 @@ function AppContent() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
-      <Text style={styles.header}>{t.appTitle}</Text>
+      <View style={styles.headerContainer}>
+        <Text style={styles.header}>{t.appTitle}</Text>
+        <Text style={styles.headerModel}>{t.modelName}</Text>
+      </View>
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
       >
-        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-          {imageUri ? (
-            <Image
-              source={{ uri: imageUri }}
-              resizeMode="cover"
-              style={styles.preview}
-            />
-          ) : (
-            <View style={styles.placeholder}>
-              <Text style={styles.placeholderText}>{t.tapToSelect}</Text>
-            </View>
-          )}
+        {imageUris.length > 0 && (
+          <View style={styles.imageGrid}>
+            {imageUris.map((uri, index) => (
+              <View key={uri + index} style={styles.imageThumbWrap}>
+                <Image
+                  source={{ uri }}
+                  resizeMode="cover"
+                  style={styles.imageThumb}
+                />
+                <TouchableOpacity
+                  style={styles.removeBtn}
+                  onPress={() => removeImage(index)}
+                >
+                  <Text style={styles.removeBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+        {imageUris.length > 0 && (
+          <Text style={styles.imageCountText}>
+            {t.imageCount(imageUris.length)}
+          </Text>
+        )}
+        <TouchableOpacity style={styles.addImageBtn} onPress={pickImage}>
+          <Text style={styles.addImageBtnText}>{t.tapToSelect}</Text>
         </TouchableOpacity>
 
         <TextInput
@@ -508,14 +568,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
+  headerContainer: {
+    backgroundColor: "#fff",
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#ddd",
+    alignItems: "center",
+  },
   header: {
     fontSize: 20,
     fontWeight: "700",
     textAlign: "center",
-    paddingVertical: 12,
-    backgroundColor: "#fff",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ddd",
+  },
+  headerModel: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 2,
   },
   title: {
     fontSize: 24,
@@ -569,26 +637,56 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  imagePicker: {
-    width: "100%",
-    aspectRatio: 4 / 3,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#e9ecef",
-    marginBottom: 16,
+  imageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
   },
-  preview: {
+  imageThumbWrap: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  imageThumb: {
     width: "100%",
     height: "100%",
   },
-  placeholder: {
-    flex: 1,
+  removeBtn: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
-  placeholderText: {
-    fontSize: 16,
+  removeBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  imageCountText: {
+    fontSize: 13,
     color: "#888",
+    marginBottom: 8,
+  },
+  addImageBtn: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderStyle: "dashed",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 16,
+    backgroundColor: "#f0f0f0",
+  },
+  addImageBtnText: {
+    fontSize: 15,
+    color: "#666",
   },
   input: {
     backgroundColor: "#fff",
