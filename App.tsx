@@ -23,14 +23,14 @@ const MODEL_DIR = new Directory(Paths.document, "models");
 
 const MODEL_FILES = {
   text: {
-    name: "InternVL2_5-1B-Q8_0.gguf",
-    url: "https://huggingface.co/ggml-org/InternVL2_5-1B-GGUF/resolve/main/InternVL2_5-1B-Q8_0.gguf",
-    sizeMB: 644,
+    name: "InternVL2_5-4B-Q4_K_M.gguf",
+    url: "https://huggingface.co/ggml-org/InternVL2_5-4B-GGUF/resolve/main/InternVL2_5-4B-Q4_K_M.gguf",
+    sizeMB: 2004,
   },
   mmproj: {
-    name: "mmproj-InternVL2_5-1B-Q8_0.gguf",
-    url: "https://huggingface.co/ggml-org/InternVL2_5-1B-GGUF/resolve/main/mmproj-InternVL2_5-1B-Q8_0.gguf",
-    sizeMB: 317,
+    name: "mmproj-InternVL2_5-4B-Q8_0.gguf",
+    url: "https://huggingface.co/ggml-org/InternVL2_5-4B-GGUF/resolve/main/mmproj-InternVL2_5-4B-Q8_0.gguf",
+    sizeMB: 325,
   },
 };
 
@@ -40,7 +40,7 @@ const STRINGS = {
     appTitle: "Vision LLM",
     checkingModels: "모델 확인 중...",
     downloadTitle: "온디바이스 Vision LLM",
-    modelName: "InternVL2.5-1B (Q8_0)",
+    modelName: "InternVL2.5-4B (Q4_K_M)",
     totalDownload: "총 다운로드",
     downloadBtn: "모델 다운로드",
     tapToSelect: "이미지를 탭하여 선택",
@@ -66,7 +66,7 @@ const STRINGS = {
     appTitle: "Vision LLM",
     checkingModels: "モデルを確認中...",
     downloadTitle: "オンデバイス Vision LLM",
-    modelName: "InternVL2.5-1B (Q8_0)",
+    modelName: "InternVL2.5-4B (Q4_K_M)",
     totalDownload: "合計ダウンロード",
     downloadBtn: "モデルをダウンロード",
     tapToSelect: "タップして画像を選択",
@@ -92,7 +92,7 @@ const STRINGS = {
     appTitle: "Vision LLM",
     checkingModels: "正在检查模型...",
     downloadTitle: "本地 Vision LLM",
-    modelName: "InternVL2.5-1B (Q8_0)",
+    modelName: "InternVL2.5-4B (Q4_K_M)",
     totalDownload: "总下载量",
     downloadBtn: "下载模型",
     tapToSelect: "点击选择图片",
@@ -118,7 +118,7 @@ const STRINGS = {
     appTitle: "Vision LLM",
     checkingModels: "Checking models...",
     downloadTitle: "On-Device Vision LLM",
-    modelName: "InternVL2.5-1B (Q8_0)",
+    modelName: "InternVL2.5-4B (Q4_K_M)",
     totalDownload: "Total download",
     downloadBtn: "Download Model",
     tapToSelect: "Tap to select image",
