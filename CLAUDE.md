@@ -31,8 +31,9 @@
 ### 범위 (scope)
 
 - `model` — LLM 모델 로딩/다운로드 관련
-- `inference` — 추론 로직
+- `inference` — 추론 로직 (lib/inference/ 공유 모듈 포함)
 - `ui` — UI 컴포넌트
+- `cli` — CLI 스크립트 (scripts/*.ts)
 - `config` — app.json, 빌드 설정
 - `deps` — 의존성 추가/변경
 
@@ -47,17 +48,64 @@
 ### 예시
 
 ```
-feat(model): SmolVLM-500M 멀티모달 모델 다운로드 추가
+feat(model): Gemma 3 4B 멀티모달 모델로 전환
 
-chore(deps): react-native-safe-area-context 의존성 추가
+chore(deps): tsx devDependency 추가
 
-fix(inference): cleanup 시 context ref 초기화하여 stale 참조 방지
+fix(inference): system role 대신 user 턴에 시스템 프롬프트 병합
 
-refactor(ui): expo-file-system 레거시 API를 File/Directory 클래스로 전환
+refactor(inference): 추론 설정을 lib/inference/ 공유 모듈로 추출
 
-feat(inference)!: 멀티모달 초기화에 GPU 필수 적용
+feat(cli): TypeScript CLI 추론 러너 추가
 
-BREAKING CHANGE: use_gpu 기본값이 true로 변경, 시뮬레이터 미지원
+BREAKING CHANGE: bash 스크립트 제거, npm run infer/analyze로 대체
+```
+
+---
+
+## 추론 모듈 아키텍처
+
+### 공유 모듈 (`lib/inference/`)
+
+모델 설정, 추론 파라미터, 시스템 프롬프트를 한 곳에서 관리. 앱(llama.rn)과 CLI(llama-mtmd-cli) 양쪽이 동일한 설정을 참조.
+
+- `config.ts` — 모델 파일명/URL, 추론 파라미터 (`n_ctx`, `n_predict`, `temperature`, `stop`)
+- `prompt.ts` — 시스템 프롬프트, Gemma 채팅 템플릿 빌더 (`buildGemmaPrompt`)
+- `types.ts` — 공유 타입 (`ModelFiles`, `InferenceParams`, `InferenceResult`)
+
+이 모듈은 **플랫폼 의존성 없음** (`expo-file-system` 등 import 금지). Node.js와 React Native 양쪽에서 import 가능해야 함.
+
+### 모델 설정 변경 시
+
+모델을 교체하거나 파라미터를 바꿀 때는 `lib/inference/config.ts`만 수정하면 앱과 CLI 양쪽에 반영됨.
+
+### Gemma 3 chat template 주의사항
+
+Gemma 3에서 `role: "system"` 메시지를 별도로 보내면 무시될 수 있음. 시스템 지시는 반드시 user 턴 텍스트에 직접 포함.
+
+```tsx
+// BAD — Gemma 3에서 system role 무시됨
+messages: [
+  { role: "system", content: SYSTEM_PROMPT },
+  { role: "user", content: [...] },
+]
+
+// GOOD — user 메시지에 시스템 프롬프트 병합
+messages: [
+  { role: "user", content: [
+    { type: "text", text: SYSTEM_PROMPT + "\n\n" + prompt },
+    ...images,
+  ]},
+]
+```
+
+### CLI 테스트
+
+앱 빌드 없이 터미널에서 추론을 빠르게 검증할 수 있음. `llama-mtmd-cli` 필요 (`brew install llama.cpp`).
+
+```bash
+npm run infer -- ./photo.jpg -p "이 사진을 설명해줘"
+npm run analyze                # scripts/ 내 전체 이미지 일괄 분석
 ```
 
 ---

@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test:local": "bash scripts/test-local.sh"
+    "infer": "tsx scripts/cli-inference.ts",
+    "analyze": "tsx scripts/analyze-images.ts"
   },
   "dependencies": {
     "expo": "~55.0.8",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.2"
   },
   "private": true

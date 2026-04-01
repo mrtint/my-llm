@@ -42,6 +42,12 @@ yarn-error.*
 # inference results
 /scripts/results
 
+# test images
+/scripts/*.jpg
+/scripts/*.jpeg
+/scripts/*.png
+/scripts/*.webp
+
 # generated native folders
 /ios
 /android

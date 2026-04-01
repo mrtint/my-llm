@@ -35,8 +35,9 @@ alwaysApply: true
 
 이 프로젝트에서 사용할 범위:
 - `model` — LLM 모델 로딩/다운로드 관련
-- `inference` — 추론 로직
+- `inference` — 추론 로직 (lib/inference/ 공유 모듈 포함)
 - `ui` — UI 컴포넌트
+- `cli` — CLI 스크립트 (scripts/*.ts)
 - `config` — app.json, 빌드 설정
 - `deps` — 의존성 추가/변경
 
@@ -51,15 +52,15 @@ alwaysApply: true
 ## 예시
 
 ```
-feat(model): SmolVLM-500M 멀티모달 모델 다운로드 추가
+feat(model): Gemma 3 4B 멀티모달 모델로 전환
 
-chore(deps): react-native-safe-area-context 의존성 추가
+chore(deps): tsx devDependency 추가
 
-fix(inference): cleanup 시 context ref 초기화하여 stale 참조 방지
+fix(inference): system role 대신 user 턴에 시스템 프롬프트 병합
 
-refactor(ui): expo-file-system 레거시 API를 File/Directory 클래스로 전환
+refactor(inference): 추론 설정을 lib/inference/ 공유 모듈로 추출
 
-feat(inference)!: 멀티모달 초기화에 GPU 필수 적용
+feat(cli): TypeScript CLI 추론 러너 추가
 
-BREAKING CHANGE: use_gpu 기본값이 true로 변경, 시뮬레이터 미지원
+BREAKING CHANGE: bash 스크립트 제거, npm run infer/analyze로 대체
 ```
