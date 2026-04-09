@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Alert } from "react-native";
 import { File } from "expo-file-system";
+import * as Device from "expo-device";
 import { initLlama, type LlamaContext } from "llama.rn";
 import { MODEL_DIR, MODEL_FILES, type ModelState } from "../lib/constants";
 import { INFERENCE_PARAMS } from "../lib/inference";
@@ -98,7 +99,9 @@ export function useModelManager() {
       const context = await initLlama({
         model: textFile.uri,
         n_ctx: INFERENCE_PARAMS.n_ctx,
-        n_gpu_layers: INFERENCE_PARAMS.n_gpu_layers_simulator,
+        n_gpu_layers: Device.isDevice
+          ? INFERENCE_PARAMS.n_gpu_layers_device
+          : INFERENCE_PARAMS.n_gpu_layers_simulator,
         ctx_shift: false,
       });
 
