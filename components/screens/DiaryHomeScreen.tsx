@@ -7,33 +7,43 @@ import {
   ActivityIndicator,
   StyleSheet,
   RefreshControl,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import * as ImagePicker from "expo-image-picker";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { LlamaContext } from "llama.rn";
 import { t } from "../../lib/i18n";
-import { getDiaryEntries, getDiaryEntry } from "../../lib/diary/storage";
+import { getDiaryEntries } from "../../lib/diary/storage";
 import type { DiaryEntry } from "../../lib/diary/types";
 import { useDiaryGenerator } from "../../hooks/useDiaryGenerator";
 import { useDailyNotification } from "../../hooks/useDailyNotification";
 import { DiaryCard } from "../DiaryCard";
 import type { DiaryStackParamList } from "../../navigation/types";
 
+const MAX_PHOTOS = 3;
+
 interface DiaryHomeScreenProps {
-  contextRef: React.MutableRefObject<LlamaContext | null>;
+  acquireContext: () => Promise<LlamaContext | null>;
+  releaseContext: () => void;
   navigation: NativeStackNavigationProp<DiaryStackParamList, "DiaryHome">;
 }
 
-export function DiaryHomeScreen({ contextRef, navigation }: DiaryHomeScreenProps) {
+export function DiaryHomeScreen({
+  acquireContext,
+  releaseContext,
+  navigation,
+}: DiaryHomeScreenProps) {
   useDailyNotification();
 
   const todayStr = new Date().toISOString().split("T")[0];
   const [todayEntry, setTodayEntry] = useState<DiaryEntry | null>(null);
   const [pastEntries, setPastEntries] = useState<DiaryEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedUris, setSelectedUris] = useState<string[]>([]);
 
-  const diary = useDiaryGenerator(contextRef);
+  const diary = useDiaryGenerator(acquireContext, releaseContext);
 
   const loadEntries = useCallback(async () => {
     const all = await getDiaryEntries();
@@ -46,10 +56,10 @@ export function DiaryHomeScreen({ contextRef, navigation }: DiaryHomeScreenProps
     loadEntries();
   }, [loadEntries]);
 
-  // After diary generation completes, reload entries
   useEffect(() => {
     if (diary.status === "done") {
       loadEntries();
+      setSelectedUris([]);
     }
   }, [diary.status, loadEntries]);
 
@@ -59,7 +69,30 @@ export function DiaryHomeScreen({ contextRef, navigation }: DiaryHomeScreenProps
     setRefreshing(false);
   }, [loadEntries]);
 
+  const pickPhotos = useCallback(async () => {
+    const remaining = MAX_PHOTOS - selectedUris.length;
+    if (remaining <= 0) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setSelectedUris((prev) =>
+        [...prev, ...result.assets.map((a) => a.uri)].slice(0, MAX_PHOTOS),
+      );
+    }
+  }, [selectedUris.length]);
+
+  const removePhoto = useCallback((index: number) => {
+    setSelectedUris((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   const isGenerating = !["idle", "done", "error"].includes(diary.status);
+  const canGenerate = selectedUris.length > 0 && !isGenerating;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -71,53 +104,91 @@ export function DiaryHomeScreen({ contextRef, navigation }: DiaryHomeScreenProps
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        {/* Today's diary section */}
-        <View style={styles.section}>
-          {isGenerating ? (
-            <View style={styles.generatingBox}>
-              <ActivityIndicator size="small" color="#4a90d9" style={styles.spinner} />
-              <Text style={styles.generatingText}>{diary.progress}</Text>
+        {/* 사진 선택 영역 */}
+        {!isGenerating && diary.status !== "done" && (
+          <View style={styles.section}>
+            <View style={styles.photoRow}>
+              {selectedUris.map((uri, i) => (
+                <View key={i} style={styles.photoThumbWrap}>
+                  <Image source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
+                  <TouchableOpacity
+                    style={styles.removeBtn}
+                    onPress={() => removePhoto(i)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.removeBtnText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {selectedUris.length < MAX_PHOTOS && (
+                <TouchableOpacity style={styles.addPhotoBtn} onPress={pickPhotos}>
+                  <Text style={styles.addPhotoBtnIcon}>+</Text>
+                  <Text style={styles.addPhotoBtnLabel}>
+                    {selectedUris.length === 0
+                      ? t.diaryGenerate
+                      : `${selectedUris.length}/${MAX_PHOTOS}`}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
-          ) : diary.status === "error" ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorTitle}>{t.diaryError}</Text>
-              <Text style={styles.errorMsg}>{diary.error}</Text>
+
+            {selectedUris.length > 0 && (
               <TouchableOpacity
-                style={styles.retryBtn}
-                onPress={() => { diary.reset(); diary.generate(); }}
+                style={[styles.generateBtn, !canGenerate && styles.generateBtnDisabled]}
+                onPress={() => diary.generate(selectedUris)}
+                disabled={!canGenerate}
               >
-                <Text style={styles.retryBtnText}>{t.diaryRetry}</Text>
+                <Text style={styles.generateBtnText}>{t.diaryGenerating}</Text>
               </TouchableOpacity>
-            </View>
-          ) : todayEntry ? (
+            )}
+
+            {diary.status === "error" && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorTitle}>{t.diaryError}</Text>
+                <Text style={styles.errorMsg}>{diary.error}</Text>
+                <TouchableOpacity
+                  style={styles.retryBtn}
+                  onPress={() => {
+                    diary.reset();
+                  }}
+                >
+                  <Text style={styles.retryBtnText}>{t.diaryRetry}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* 생성 중 */}
+        {isGenerating && (
+          <View style={styles.generatingBox}>
+            <ActivityIndicator size="small" color="#4a90d9" style={styles.spinner} />
+            <Text style={styles.generatingText}>{diary.progress}</Text>
+          </View>
+        )}
+
+        {/* 오늘 일기 */}
+        {todayEntry && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>오늘</Text>
             <TouchableOpacity
               style={styles.todayCard}
               activeOpacity={0.8}
               onPress={() => navigation.navigate("DiaryDetail", { date: todayStr })}
             >
-              <Text style={styles.todayLabel}>오늘</Text>
               <Text style={styles.todayContent} numberOfLines={5}>
                 {todayEntry.content}
               </Text>
               <Text style={styles.readMore}>더 보기 →</Text>
             </TouchableOpacity>
-          ) : (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>{t.diaryEmpty}</Text>
-              <TouchableOpacity
-                style={styles.generateBtn}
-                onPress={diary.generate}
-                disabled={isGenerating}
-              >
-                <Text style={styles.generateBtnText}>{t.diaryGenerate}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+          </View>
+        )}
 
-        {/* Past entries */}
+        {/* 과거 일기 */}
         {pastEntries.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t.diaryPastEntries}</Text>
@@ -125,15 +196,23 @@ export function DiaryHomeScreen({ contextRef, navigation }: DiaryHomeScreenProps
               <DiaryCard
                 key={entry.id}
                 entry={entry}
-                onPress={() => navigation.navigate("DiaryDetail", { date: entry.date })}
+                onPress={() =>
+                  navigation.navigate("DiaryDetail", { date: entry.date })
+                }
               />
             ))}
           </View>
+        )}
+
+        {todayEntry === null && pastEntries.length === 0 && !isGenerating && (
+          <Text style={styles.emptyText}>{t.diaryEmpty}</Text>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const THUMB_SIZE = 90;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8f9fa" },
@@ -149,19 +228,69 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16, paddingBottom: 40 },
   section: { marginBottom: 24 },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
     color: "#888",
-    marginBottom: 10,
+    marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
+  photoRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 12,
+  },
+  photoThumbWrap: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 10,
+    overflow: "visible",
+  },
+  photoThumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 10,
+  },
+  removeBtn: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: "#333",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  removeBtnText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  addPhotoBtn: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#4a90d9",
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addPhotoBtnIcon: { fontSize: 24, color: "#4a90d9", lineHeight: 28 },
+  addPhotoBtnLabel: { fontSize: 11, color: "#4a90d9", marginTop: 2 },
+  generateBtn: {
+    backgroundColor: "#4a90d9",
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  generateBtnDisabled: { backgroundColor: "#b0c8e8" },
+  generateBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   generatingBox: {
     backgroundColor: "#fff",
     borderRadius: 12,
     padding: 20,
-    alignItems: "center",
     flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -176,6 +305,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#fcc",
+    marginTop: 8,
   },
   errorTitle: { fontSize: 15, fontWeight: "600", color: "#c00", marginBottom: 4 },
   errorMsg: { fontSize: 14, color: "#666", marginBottom: 12 },
@@ -197,33 +327,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  todayLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#4a90d9",
-    marginBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
   todayContent: { fontSize: 16, color: "#222", lineHeight: 26 },
   readMore: { fontSize: 13, color: "#4a90d9", marginTop: 10, fontWeight: "500" },
-  emptyBox: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 32,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  emptyText: { fontSize: 15, color: "#aaa", marginBottom: 20 },
-  generateBtn: {
-    backgroundColor: "#4a90d9",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  generateBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  emptyText: { textAlign: "center", color: "#bbb", fontSize: 15, marginTop: 40 },
 });
