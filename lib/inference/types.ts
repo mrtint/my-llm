@@ -11,6 +11,7 @@ export interface ModelFiles {
 
 export interface InferenceParams {
   n_ctx: number;
+  n_ctx_simulator: number;
   n_predict: number;
   temperature: number;
   stop: string[];

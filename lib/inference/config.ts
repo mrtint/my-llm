@@ -15,6 +15,7 @@ export const MODEL_FILES: ModelFiles = {
 
 export const INFERENCE_PARAMS: InferenceParams = {
   n_ctx: 8192,
+  n_ctx_simulator: 2048,
   n_predict: 1024,
   temperature: 0.2,
   stop: ["<end_of_turn>"],

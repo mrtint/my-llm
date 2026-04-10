@@ -7,6 +7,7 @@ import type { PhotoAnalysis } from "../lib/diary/types";
 
 export type DiaryGenerateStatus =
   | "idle"
+  | "loading_model"
   | "analyzing"
   | "synthesizing"
   | "saving"
@@ -56,10 +57,16 @@ export function useDiaryGenerator(
       setResult("");
 
       console.log("[Diary] 일기 생성 시작, 사진 수:", imageUris.length);
-      console.log("[Diary] 컨텍스트 획득 중...");
 
+      // 즉시 로딩 상태로 전환 — UI가 바로 반응
+      setStatus("loading_model");
+      setProgress("모델 준비 중...");
+      startTimer();
+
+      console.log("[Diary] 컨텍스트 획득 중...");
       const ctx = await acquireContext();
       if (!ctx) {
+        stopTimer();
         console.error("[Diary] 컨텍스트 획득 실패");
         setError("모델을 로드할 수 없습니다. 다른 작업이 진행 중일 수 있습니다.");
         setStatus("error");
@@ -67,7 +74,6 @@ export function useDiaryGenerator(
       }
 
       console.log("[Diary] 컨텍스트 획득 완료");
-      startTimer();
 
       try {
         // Phase 1: 사진 분석
