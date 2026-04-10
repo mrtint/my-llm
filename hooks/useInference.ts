@@ -1,14 +1,15 @@
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import type { LlamaContext } from "llama.rn";
+import { prepareImageForInference } from "../lib/image";
 import { INFERENCE_PARAMS, buildLanguageInstruction } from "../lib/inference";
 import { t } from "../lib/i18n";
 
 export function useInference(
-  contextRef: React.MutableRefObject<LlamaContext | null>,
+  acquireContext: () => Promise<LlamaContext | null>,
+  releaseContext: () => void,
   imageUris: string[],
   prompt: string,
-  loadModel: () => Promise<void>,
 ) {
   const [response, setResponse] = useState("");
   const [elapsedTime, setElapsedTime] = useState<string | null>(null);
@@ -24,15 +25,14 @@ export function useInference(
   };
 
   const runInference = async () => {
-    if (!contextRef.current) {
-      await loadModel();
-    }
-    if (!contextRef.current) {
-      Alert.alert(t.errorTitle, t.errorModelNotLoaded);
-      return;
-    }
     if (imageUris.length === 0) {
       Alert.alert(t.errorTitle, t.errorSelectImage);
+      return;
+    }
+
+    const ctx = await acquireContext();
+    if (!ctx) {
+      Alert.alert(t.errorTitle, t.errorModelNotLoaded);
       return;
     }
 
@@ -44,14 +44,17 @@ export function useInference(
       setElapsedTime(formatTime(Date.now() - startTimeRef.current));
     }, 1000);
     try {
-      const result = await contextRef.current.completion(
+      const processedUris = await Promise.all(
+        imageUris.map(prepareImageForInference),
+      );
+      const result = await ctx.completion(
         {
           messages: [
             {
               role: "user",
               content: [
                 { type: "text", text: prompt + "\n\n" + buildLanguageInstruction(prompt) },
-                ...imageUris.map((uri) => ({
+                ...processedUris.map((uri) => ({
                   type: "image_url" as const,
                   image_url: { url: uri },
                 })),
@@ -92,6 +95,7 @@ export function useInference(
         e?.message || JSON.stringify(e) || "Unknown error"
       );
     } finally {
+      releaseContext();
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import type { LlamaContext } from "llama.rn";
 import { buildPhotoPrompt, buildSynthesisPrompt } from "../lib/diary/prompts";
 import { saveDiaryEntry } from "../lib/diary/storage";
+import { prepareImageForInference } from "../lib/image";
 import { INFERENCE_PARAMS } from "../lib/inference";
 import type { PhotoAnalysis } from "../lib/diary/types";
 
@@ -83,15 +84,19 @@ export function useDiaryGenerator(
 
         for (let i = 0; i < imageUris.length; i++) {
           const stepStart = Date.now();
-          setProgress(`사진 ${i + 1}/${imageUris.length} 분석 중...`);
-          console.log(`[Diary] 사진 ${i + 1}/${imageUris.length} 분석 시작:`, imageUris[i].slice(-30));
+          setProgress(`사진 ${i + 1}/${imageUris.length} 준비 중...`);
+          console.log(`[Diary] 사진 ${i + 1}/${imageUris.length} 전처리 시작:`, imageUris[i].slice(-30));
 
+          const processedUri = await prepareImageForInference(imageUris[i]);
+          console.log(`[Diary] 사진 ${i + 1} 전처리 완료 (JPEG 1024px):`, processedUri.slice(-30));
+
+          setProgress(`사진 ${i + 1}/${imageUris.length} 분석 중...`);
           const time = now.toLocaleTimeString("ko-KR", {
             hour: "2-digit",
             minute: "2-digit",
           });
           const prompt = buildPhotoPrompt(time, null);
-          const description = await runPhotoAnalysis(ctx, imageUris[i], prompt);
+          const description = await runPhotoAnalysis(ctx, processedUri, prompt);
 
           const stepElapsed = formatElapsed(Date.now() - stepStart);
           console.log(`[Diary] 사진 ${i + 1} 분석 완료 (${stepElapsed}):`, description.slice(0, 80));
