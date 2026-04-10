@@ -8,7 +8,12 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "infer": "tsx scripts/cli-inference.ts",
-    "analyze": "tsx scripts/analyze-images.ts"
+    "analyze": "tsx scripts/analyze-images.ts",
+    "typecheck": "tsc --noEmit",
+    "doctor": "npx expo-doctor",
+    "test": "jest",
+    "check": "npm run typecheck && npm run test",
+    "prepare": "husky"
   },
   "dependencies": {
     "@react-navigation/bottom-tabs": "^7.15.9",
@@ -33,9 +38,22 @@
     "react-native-screens": "~4.23.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
+    "husky": "^9.1.7",
+    "jest": "^29.7.0",
+    "jest-expo": "~55.0.5",
     "tsx": "^4.21.0",
     "typescript": "~5.9.2"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|react-navigation|@react-navigation/.*|llama\\.rn)"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ]
   },
   "private": true
 }
