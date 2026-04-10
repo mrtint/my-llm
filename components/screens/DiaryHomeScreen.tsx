@@ -167,8 +167,20 @@ export function DiaryHomeScreen({
         {isGenerating && (
           <View style={styles.generatingBox}>
             <ActivityIndicator size="small" color="#4a90d9" style={styles.spinner} />
-            <Text style={styles.generatingText}>{diary.progress}</Text>
+            <View style={styles.generatingInfo}>
+              <Text style={styles.generatingText}>{diary.progress}</Text>
+              {diary.elapsedTime && (
+                <Text style={styles.elapsedText}>{diary.elapsedTime}</Text>
+              )}
+            </View>
           </View>
+        )}
+
+        {/* 완료 + 소요 시간 */}
+        {diary.status === "done" && diary.elapsedTime && (
+          <Text style={styles.doneTime}>
+            {diary.elapsedTime}에 생성 완료
+          </Text>
         )}
 
         {/* 오늘 일기 */}
@@ -298,7 +310,16 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   spinner: { marginRight: 12 },
-  generatingText: { fontSize: 15, color: "#555", flex: 1 },
+  generatingInfo: { flex: 1 },
+  generatingText: { fontSize: 15, color: "#555" },
+  elapsedText: { fontSize: 13, color: "#999", marginTop: 4 },
+  doneTime: {
+    textAlign: "center",
+    fontSize: 13,
+    color: "#4a90d9",
+    marginBottom: 12,
+    fontWeight: "500",
+  },
   errorBox: {
     backgroundColor: "#fff5f5",
     borderRadius: 12,

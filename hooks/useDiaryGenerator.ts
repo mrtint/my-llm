@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { LlamaContext } from "llama.rn";
 import { buildPhotoPrompt, buildSynthesisPrompt } from "../lib/diary/prompts";
 import { saveDiaryEntry } from "../lib/diary/storage";
@@ -13,6 +13,12 @@ export type DiaryGenerateStatus =
   | "done"
   | "error";
 
+function formatElapsed(ms: number): string {
+  const mins = Math.floor(ms / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+}
+
 export function useDiaryGenerator(
   acquireContext: () => Promise<LlamaContext | null>,
   releaseContext: () => void,
@@ -21,6 +27,26 @@ export function useDiaryGenerator(
   const [progress, setProgress] = useState("");
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
+  const [elapsedTime, setElapsedTime] = useState<string | null>(null);
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number>(0);
+
+  const startTimer = () => {
+    startTimeRef.current = Date.now();
+    setElapsedTime("0s");
+    timerRef.current = setInterval(() => {
+      setElapsedTime(formatElapsed(Date.now() - startTimeRef.current));
+    }, 1000);
+  };
+
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setElapsedTime(formatElapsed(Date.now() - startTimeRef.current));
+  };
 
   const generate = useCallback(
     async (imageUris: string[]) => {
@@ -29,44 +55,73 @@ export function useDiaryGenerator(
       setError("");
       setResult("");
 
+      console.log("[Diary] 일기 생성 시작, 사진 수:", imageUris.length);
+      console.log("[Diary] 컨텍스트 획득 중...");
+
       const ctx = await acquireContext();
       if (!ctx) {
+        console.error("[Diary] 컨텍스트 획득 실패");
         setError("모델을 로드할 수 없습니다. 다른 작업이 진행 중일 수 있습니다.");
         setStatus("error");
         return;
       }
 
+      console.log("[Diary] 컨텍스트 획득 완료");
+      startTimer();
+
       try {
+        // Phase 1: 사진 분석
         setStatus("analyzing");
         const analyses: PhotoAnalysis[] = [];
         const now = new Date();
 
         for (let i = 0; i < imageUris.length; i++) {
+          const stepStart = Date.now();
           setProgress(`사진 ${i + 1}/${imageUris.length} 분석 중...`);
+          console.log(`[Diary] 사진 ${i + 1}/${imageUris.length} 분석 시작:`, imageUris[i].slice(-30));
+
           const time = now.toLocaleTimeString("ko-KR", {
             hour: "2-digit",
             minute: "2-digit",
           });
           const prompt = buildPhotoPrompt(time, null);
           const description = await runPhotoAnalysis(ctx, imageUris[i], prompt);
+
+          const stepElapsed = formatElapsed(Date.now() - stepStart);
+          console.log(`[Diary] 사진 ${i + 1} 분석 완료 (${stepElapsed}):`, description.slice(0, 80));
           analyses.push({ uri: imageUris[i], time, place: null, description });
         }
 
+        // Phase 2: 일기 합성
+        const synthStart = Date.now();
         setStatus("synthesizing");
         setProgress("일기를 작성하는 중...");
+        console.log("[Diary] 일기 합성 시작");
+
         const diaryContent = await runTextSynthesis(
           ctx,
           buildSynthesisPrompt(analyses),
         );
 
+        const synthElapsed = formatElapsed(Date.now() - synthStart);
+        console.log(`[Diary] 일기 합성 완료 (${synthElapsed}):`, diaryContent.slice(0, 100));
+
+        // Phase 3: 저장
         setStatus("saving");
         const dateStr = now.toISOString().split("T")[0];
         await saveDiaryEntry(dateStr, diaryContent, analyses);
+        console.log("[Diary] SQLite 저장 완료, 날짜:", dateStr);
+
+        stopTimer();
+        const totalElapsed = formatElapsed(Date.now() - startTimeRef.current);
+        console.log(`[Diary] 전체 완료 — 총 ${totalElapsed}`);
 
         setResult(diaryContent);
         setStatus("done");
         setProgress("");
       } catch (e: any) {
+        stopTimer();
+        console.error("[Diary] 오류 발생:", e?.message || e);
         setError(e?.message || "일기 생성에 실패했습니다");
         setStatus("error");
         setProgress("");
@@ -82,9 +137,14 @@ export function useDiaryGenerator(
     setProgress("");
     setResult("");
     setError("");
+    setElapsedTime(null);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
   }, []);
 
-  return { generate, reset, status, progress, result, error };
+  return { generate, reset, status, progress, result, error, elapsedTime };
 }
 
 async function runPhotoAnalysis(
@@ -110,6 +170,10 @@ async function runPhotoAnalysis(
     },
     () => {},
   );
+  console.log("[Diary] completion stats:", {
+    tokens: result.tokens_predicted,
+    speed: result.timings?.predicted_per_second?.toFixed(1) + " t/s",
+  });
   return result.text.trim();
 }
 
@@ -127,5 +191,9 @@ async function runTextSynthesis(
     },
     () => {},
   );
+  console.log("[Diary] synthesis stats:", {
+    tokens: result.tokens_predicted,
+    speed: result.timings?.predicted_per_second?.toFixed(1) + " t/s",
+  });
   return result.text.trim();
 }
