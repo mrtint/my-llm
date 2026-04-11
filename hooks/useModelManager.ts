@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Alert } from "react-native";
 import { File } from "expo-file-system";
+import * as Device from "expo-device";
 import { initLlama, type LlamaContext } from "llama.rn";
 import { MODEL_DIR, MODEL_FILES, type ModelState } from "../lib/constants";
 import { INFERENCE_PARAMS } from "../lib/inference";
@@ -17,6 +18,8 @@ function cleanupOldModels() {
   }
 }
 
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export function useModelManager() {
   const [modelState, setModelState] = useState<ModelState>("checking");
   const [downloadStatus, setDownloadStatus] = useState("");
@@ -24,6 +27,8 @@ export function useModelManager() {
   const [loadingModel, setLoadingModel] = useState(false);
 
   const contextRef = useRef<LlamaContext | null>(null);
+  const busyRef = useRef(false);
+  const loadPromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     checkModels();
@@ -88,7 +93,7 @@ export function useModelManager() {
     }
   };
 
-  const loadModel = useCallback(async () => {
+  const loadModelInternal = async () => {
     if (contextRef.current) return;
     setLoadingModel(true);
     try {
@@ -97,15 +102,18 @@ export function useModelManager() {
 
       const context = await initLlama({
         model: textFile.uri,
-        n_ctx: INFERENCE_PARAMS.n_ctx,
-        n_gpu_layers: INFERENCE_PARAMS.n_gpu_layers_simulator,
+        n_ctx: Device.isDevice
+          ? INFERENCE_PARAMS.n_ctx
+          : INFERENCE_PARAMS.n_ctx_simulator,
+        n_gpu_layers: Device.isDevice
+          ? INFERENCE_PARAMS.n_gpu_layers_device
+          : INFERENCE_PARAMS.n_gpu_layers_simulator,
         ctx_shift: false,
       });
 
       const mmOk = await context.initMultimodal({
         path: mmprojFile.uri,
         use_gpu: false,
-        image_max_tokens: 512,
       });
 
       if (!mmOk) {
@@ -120,12 +128,48 @@ export function useModelManager() {
         support.audio
       );
 
+      // 네이티브 초기화 완료 대기 — "Context is busy" 방지
+      await delay(300);
+
       contextRef.current = context;
     } catch (e: any) {
       Alert.alert(t.errorModelLoad, e.message);
     } finally {
       setLoadingModel(false);
     }
+  };
+
+  const loadModel = useCallback(async () => {
+    if (contextRef.current) return;
+    if (loadPromiseRef.current) {
+      await loadPromiseRef.current;
+      return;
+    }
+    loadPromiseRef.current = loadModelInternal();
+    try {
+      await loadPromiseRef.current;
+    } finally {
+      loadPromiseRef.current = null;
+    }
+  }, []);
+
+  const acquireContext = useCallback(async (): Promise<LlamaContext | null> => {
+    await loadModel();
+    if (!contextRef.current) return null;
+
+    const maxWait = 10;
+    for (let i = 0; i < maxWait; i++) {
+      if (!busyRef.current) {
+        busyRef.current = true;
+        return contextRef.current;
+      }
+      await delay(500);
+    }
+    return null;
+  }, [loadModel]);
+
+  const releaseContext = useCallback(() => {
+    busyRef.current = false;
   }, []);
 
   return {
@@ -134,7 +178,10 @@ export function useModelManager() {
     errorMsg,
     loadingModel,
     contextRef,
+    busyRef,
     downloadModels,
     loadModel,
+    acquireContext,
+    releaseContext,
   };
 }

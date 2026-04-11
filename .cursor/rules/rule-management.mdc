@@ -1,0 +1,42 @@
+---
+description: 규칙 파일 관리 방법 — 새 규칙 추가 및 수정 절차
+alwaysApply: true
+---
+
+## 규칙 관리 방법
+
+이 프로젝트의 규칙(코딩 컨벤션, 아키텍처 결정 등)은 **`.cursor/rules/` 에서만 관리**한다.
+
+### 구조
+
+```
+.cursor/rules/
+  rule-management.mdc          # 이 파일 — 규칙 관리 방법 자체
+  commit-conventions.mdc       # 커밋 메시지 규칙
+  expo-rn-conventions.mdc      # Expo React Native 코딩 컨벤션
+  inference-architecture.mdc   # 추론 모듈 아키텍처
+```
+
+`CLAUDE.md`는 위 파일들을 `@` 임포트로만 참조한다. 내용을 직접 넣지 않는다.
+
+### 새 규칙 추가 시
+
+1. `.cursor/rules/<이름>.mdc` 파일 생성
+2. frontmatter 작성:
+   ```
+   ---
+   description: 규칙 설명 (한 줄)
+   alwaysApply: true   # 항상 적용 / false = globs 지정 필요
+   globs: "**/*.tsx"   # alwaysApply: false 일 때만 사용
+   ---
+   ```
+3. `CLAUDE.md` 에 `@.cursor/rules/<이름>.mdc` 한 줄 추가
+
+### 기존 규칙 수정 시
+
+해당 `.mdc` 파일만 편집한다. `CLAUDE.md`는 건드리지 않는다.
+
+### 규칙 삭제 시
+
+1. `.mdc` 파일 삭제
+2. `CLAUDE.md` 에서 해당 `@` 임포트 줄 삭제
