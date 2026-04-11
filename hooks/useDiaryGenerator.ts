@@ -3,6 +3,7 @@ import type { LlamaContext } from "llama.rn";
 import { buildPhotoPrompt, buildSynthesisPrompt } from "../lib/diary/prompts";
 import { saveDiaryEntry } from "../lib/diary/storage";
 import { prepareImageForInference } from "../lib/image";
+import type { PhotoMeta } from "../lib/photo-meta";
 import { INFERENCE_PARAMS } from "../lib/inference";
 import type { PhotoAnalysis } from "../lib/diary/types";
 
@@ -51,13 +52,13 @@ export function useDiaryGenerator(
   };
 
   const generate = useCallback(
-    async (imageUris: string[]) => {
-      if (imageUris.length === 0) return;
+    async (photos: PhotoMeta[]) => {
+      if (photos.length === 0) return;
 
       setError("");
       setResult("");
 
-      console.log("[Diary] 일기 생성 시작, 사진 수:", imageUris.length);
+      console.log("[Diary] 일기 생성 시작, 사진 수:", photos.length);
 
       // 즉시 로딩 상태로 전환 — UI가 바로 반응
       setStatus("loading_model");
@@ -81,26 +82,36 @@ export function useDiaryGenerator(
         setStatus("analyzing");
         const analyses: PhotoAnalysis[] = [];
         const now = new Date();
+        const fallbackTime = now.toLocaleTimeString("ko-KR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
 
-        for (let i = 0; i < imageUris.length; i++) {
+        for (let i = 0; i < photos.length; i++) {
+          const photo = photos[i];
           const stepStart = Date.now();
-          setProgress(`사진 ${i + 1}/${imageUris.length} 준비 중...`);
-          console.log(`[Diary] 사진 ${i + 1}/${imageUris.length} 전처리 시작:`, imageUris[i].slice(-30));
+          setProgress(`사진 ${i + 1}/${photos.length} 준비 중...`);
+          console.log(`[Diary] 사진 ${i + 1}/${photos.length} 전처리 시작:`, photo.uri.slice(-30));
+          console.log(`[Diary] 메타:`, {
+            time: photo.time,
+            date: photo.date,
+            place: photo.place,
+            hasLocation: !!photo.location,
+            hasExif: !!photo.exif,
+          });
 
-          const processedUri = await prepareImageForInference(imageUris[i]);
+          const processedUri = await prepareImageForInference(photo.uri);
           console.log(`[Diary] 사진 ${i + 1} 전처리 완료 (JPEG 1024px):`, processedUri.slice(-30));
 
-          setProgress(`사진 ${i + 1}/${imageUris.length} 분석 중...`);
-          const time = now.toLocaleTimeString("ko-KR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-          const prompt = buildPhotoPrompt(time, null);
+          setProgress(`사진 ${i + 1}/${photos.length} 분석 중...`);
+          const time = photo.time ?? fallbackTime;
+          const place = photo.place ?? null;
+          const prompt = buildPhotoPrompt(time, place);
           const description = await runPhotoAnalysis(ctx, processedUri, prompt);
 
           const stepElapsed = formatElapsed(Date.now() - stepStart);
           console.log(`[Diary] 사진 ${i + 1} 분석 완료 (${stepElapsed}):`, description.slice(0, 80));
-          analyses.push({ uri: imageUris[i], time, place: null, description });
+          analyses.push({ uri: photo.uri, time, place, description });
         }
 
         // Phase 2: 일기 합성

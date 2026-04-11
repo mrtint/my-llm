@@ -17,6 +17,7 @@ import type { LlamaContext } from "llama.rn";
 import { t } from "../../lib/i18n";
 import { getDiaryEntries } from "../../lib/diary/storage";
 import type { DiaryEntry } from "../../lib/diary/types";
+import { extractPhotoMeta, type PhotoMeta } from "../../lib/photo-meta";
 import { useDiaryGenerator } from "../../hooks/useDiaryGenerator";
 import { useDailyNotification } from "../../hooks/useDailyNotification";
 import { DiaryCard } from "../DiaryCard";
@@ -41,7 +42,7 @@ export function DiaryHomeScreen({
   const [todayEntry, setTodayEntry] = useState<DiaryEntry | null>(null);
   const [pastEntries, setPastEntries] = useState<DiaryEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedUris, setSelectedUris] = useState<string[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<PhotoMeta[]>([]);
 
   const diary = useDiaryGenerator(acquireContext, releaseContext);
 
@@ -59,7 +60,7 @@ export function DiaryHomeScreen({
   useEffect(() => {
     if (diary.status === "done") {
       loadEntries();
-      setSelectedUris([]);
+      setSelectedPhotos([]);
     }
   }, [diary.status, loadEntries]);
 
@@ -70,7 +71,7 @@ export function DiaryHomeScreen({
   }, [loadEntries]);
 
   const pickPhotos = useCallback(async () => {
-    const remaining = MAX_PHOTOS - selectedUris.length;
+    const remaining = MAX_PHOTOS - selectedPhotos.length;
     if (remaining <= 0) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -78,21 +79,25 @@ export function DiaryHomeScreen({
       allowsMultipleSelection: true,
       selectionLimit: remaining,
       quality: 0.8,
+      exif: true,
     });
 
     if (!result.canceled) {
-      setSelectedUris((prev) =>
-        [...prev, ...result.assets.map((a) => a.uri)].slice(0, MAX_PHOTOS),
+      const newMetas = await Promise.all(
+        result.assets.map((asset) => extractPhotoMeta(asset)),
+      );
+      setSelectedPhotos((prev) =>
+        [...prev, ...newMetas].slice(0, MAX_PHOTOS),
       );
     }
-  }, [selectedUris.length]);
+  }, [selectedPhotos.length]);
 
   const removePhoto = useCallback((index: number) => {
-    setSelectedUris((prev) => prev.filter((_, i) => i !== index));
+    setSelectedPhotos((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   const isGenerating = !["idle", "done", "error"].includes(diary.status);
-  const canGenerate = selectedUris.length > 0 && !isGenerating;
+  const canGenerate = selectedPhotos.length > 0 && !isGenerating;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -112,9 +117,9 @@ export function DiaryHomeScreen({
         {!isGenerating && diary.status !== "done" && (
           <View style={styles.section}>
             <View style={styles.photoRow}>
-              {selectedUris.map((uri, i) => (
+              {selectedPhotos.map((photo, i) => (
                 <View key={i} style={styles.photoThumbWrap}>
-                  <Image source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
+                  <Image source={{ uri: photo.uri }} style={styles.photoThumb} resizeMode="cover" />
                   <TouchableOpacity
                     style={styles.removeBtn}
                     onPress={() => removePhoto(i)}
@@ -122,24 +127,27 @@ export function DiaryHomeScreen({
                   >
                     <Text style={styles.removeBtnText}>✕</Text>
                   </TouchableOpacity>
+                  {photo.time && (
+                    <Text style={styles.photoMetaLabel}>{photo.time}</Text>
+                  )}
                 </View>
               ))}
-              {selectedUris.length < MAX_PHOTOS && (
+              {selectedPhotos.length < MAX_PHOTOS && (
                 <TouchableOpacity style={styles.addPhotoBtn} onPress={pickPhotos}>
                   <Text style={styles.addPhotoBtnIcon}>+</Text>
                   <Text style={styles.addPhotoBtnLabel}>
-                    {selectedUris.length === 0
+                    {selectedPhotos.length === 0
                       ? t.diaryGenerate
-                      : `${selectedUris.length}/${MAX_PHOTOS}`}
+                      : `${selectedPhotos.length}/${MAX_PHOTOS}`}
                   </Text>
                 </TouchableOpacity>
               )}
             </View>
 
-            {selectedUris.length > 0 && (
+            {selectedPhotos.length > 0 && (
               <TouchableOpacity
                 style={[styles.generateBtn, !canGenerate && styles.generateBtnDisabled]}
-                onPress={() => diary.generate(selectedUris)}
+                onPress={() => diary.generate(selectedPhotos)}
                 disabled={!canGenerate}
               >
                 <Text style={styles.generateBtnText}>{t.diaryGenerating}</Text>
@@ -255,7 +263,6 @@ const styles = StyleSheet.create({
   },
   photoThumbWrap: {
     width: THUMB_SIZE,
-    height: THUMB_SIZE,
     borderRadius: 10,
     overflow: "visible",
   },
@@ -276,6 +283,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   removeBtnText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  photoMetaLabel: {
+    fontSize: 10,
+    color: "#888",
+    textAlign: "center",
+    marginTop: 3,
+  },
   addPhotoBtn: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,
