@@ -3,7 +3,7 @@ import type { LlamaContext } from "llama.rn";
 import { buildPhotoPrompt, buildSynthesisPrompt } from "../lib/diary/prompts";
 import { saveDiaryEntry } from "../lib/diary/storage";
 import { prepareImageForInference } from "../lib/image";
-import type { PhotoMeta } from "../lib/photo-meta";
+import { sortPhotosByTime, type PhotoMeta } from "../lib/photo-meta";
 import { INFERENCE_PARAMS } from "../lib/inference";
 import type { PhotoAnalysis } from "../lib/diary/types";
 
@@ -78,7 +78,7 @@ export function useDiaryGenerator(
       console.log("[Diary] 컨텍스트 획득 완료");
 
       try {
-        // Phase 1: 사진 분석
+        // Phase 1: 사진 분석 (촬영 시간순 정렬)
         setStatus("analyzing");
         const analyses: PhotoAnalysis[] = [];
         const now = new Date();
@@ -86,12 +86,14 @@ export function useDiaryGenerator(
           hour: "2-digit",
           minute: "2-digit",
         });
+        const sorted = sortPhotosByTime(photos);
+        console.log("[Diary] 시간순 정렬 완료:", sorted.map((p) => p.time ?? "unknown"));
 
-        for (let i = 0; i < photos.length; i++) {
-          const photo = photos[i];
+        for (let i = 0; i < sorted.length; i++) {
+          const photo = sorted[i];
           const stepStart = Date.now();
-          setProgress(`사진 ${i + 1}/${photos.length} 준비 중...`);
-          console.log(`[Diary] 사진 ${i + 1}/${photos.length} 전처리 시작:`, photo.uri.slice(-30));
+          setProgress(`사진 ${i + 1}/${sorted.length} 준비 중...`);
+          console.log(`[Diary] 사진 ${i + 1}/${sorted.length} 전처리 시작:`, photo.uri.slice(-30));
           console.log(`[Diary] 메타:`, {
             time: photo.time,
             date: photo.date,
@@ -103,7 +105,7 @@ export function useDiaryGenerator(
           const processedUri = await prepareImageForInference(photo.uri);
           console.log(`[Diary] 사진 ${i + 1} 전처리 완료 (JPEG 1024px):`, processedUri.slice(-30));
 
-          setProgress(`사진 ${i + 1}/${photos.length} 분석 중...`);
+          setProgress(`사진 ${i + 1}/${sorted.length} 분석 중...`);
           const time = photo.time ?? fallbackTime;
           const place = photo.place ?? null;
           const prompt = buildPhotoPrompt(time, place);
@@ -114,15 +116,17 @@ export function useDiaryGenerator(
           analyses.push({ uri: photo.uri, time, place, description });
         }
 
-        // Phase 2: 일기 합성
+        // Phase 2: 일기 합성 (장소 그룹핑 반영)
         const synthStart = Date.now();
         setStatus("synthesizing");
         setProgress("일기를 작성하는 중...");
-        console.log("[Diary] 일기 합성 시작");
+
+        const locations = sorted.map((p) => p.location);
+        console.log("[Diary] 일기 합성 시작, 장소 데이터:", locations.map((l) => l ? "GPS" : "없음"));
 
         const diaryContent = await runTextSynthesis(
           ctx,
-          buildSynthesisPrompt(analyses),
+          buildSynthesisPrompt(analyses, locations),
         );
 
         const synthElapsed = formatElapsed(Date.now() - synthStart);

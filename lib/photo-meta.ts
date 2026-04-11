@@ -8,6 +8,8 @@ export interface PhotoMeta {
   time: string | null;
   /** 촬영 날짜 (e.g. "2026-04-11") */
   date: string | null;
+  /** 촬영 시각 Unix ms (정렬용, null이면 시간 불명) */
+  timestamp: number | null;
   /** 역지오코딩된 장소명 (e.g. "강남구 역삼동") */
   place: string | null;
   /** GPS 좌표 */
@@ -30,6 +32,7 @@ export async function extractPhotoMeta(
     uri: asset.uri,
     time: null,
     date: null,
+    timestamp: null,
     place: null,
     location: null,
     exif: asset.exif ?? null,
@@ -44,6 +47,7 @@ export async function extractPhotoMeta(
     if (dateStr) {
       const parsed = parseExifDateTime(dateStr);
       if (parsed) {
+        meta.timestamp = parsed.getTime();
         meta.time = parsed.toLocaleTimeString("ko-KR", {
           hour: "2-digit",
           minute: "2-digit",
@@ -78,6 +82,7 @@ export async function extractPhotoMeta(
       // 시간이 아직 없으면 creationTime에서 추출
       if (!meta.time && info.creationTime) {
         const created = new Date(info.creationTime);
+        meta.timestamp = created.getTime();
         meta.time = created.toLocaleTimeString("ko-KR", {
           hour: "2-digit",
           minute: "2-digit",
@@ -108,6 +113,33 @@ function parseExifDateTime(exifDate: string): Date | null {
     Number(mi),
     Number(s),
   );
+}
+
+/** 촬영 시간순 정렬. timestamp가 없는 사진은 맨 뒤로. */
+export function sortPhotosByTime(photos: PhotoMeta[]): PhotoMeta[] {
+  return [...photos].sort((a, b) => {
+    if (a.timestamp == null && b.timestamp == null) return 0;
+    if (a.timestamp == null) return 1;
+    if (b.timestamp == null) return -1;
+    return a.timestamp - b.timestamp;
+  });
+}
+
+/** Haversine 공식으로 두 GPS 좌표 간 직선 거리 (km). */
+export function haversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371; // 지구 반지름 (km)
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 async function reverseGeocode(
