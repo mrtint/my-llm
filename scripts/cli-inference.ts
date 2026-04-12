@@ -2,11 +2,15 @@
 import { spawn, execSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { resolve, dirname, basename } from "node:path";
+import { totalmem } from "node:os";
 import {
   MODEL_FILES,
   INFERENCE_PARAMS,
+  getDeviceParams,
   buildGemmaPrompt,
 } from "../lib/inference";
+
+const CLI_PARAMS = getDeviceParams(totalmem());
 
 const SCRIPT_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_DIR = resolve(SCRIPT_DIR, "..");
@@ -60,8 +64,8 @@ export function runInference(opts: {
       "--model", resolve(MODEL_DIR, MODEL_FILES.text.name),
       "--mmproj", resolve(MODEL_DIR, MODEL_FILES.mmproj.name),
       ...imageArgs,
-      "-c", String(INFERENCE_PARAMS.n_ctx),
-      "-ngl", String(INFERENCE_PARAMS.n_gpu_layers_device),
+      "-c", String(CLI_PARAMS.n_ctx),
+      "-ngl", String(CLI_PARAMS.n_gpu_layers),
       "--temp", String(INFERENCE_PARAMS.temperature),
       "-n", String(INFERENCE_PARAMS.n_predict),
       "-p", promptStr,
@@ -130,8 +134,8 @@ async function main() {
   console.log(`이미지: ${args.images.join(", ")} (${args.images.length}장)`);
   console.log(`프롬프트: ${args.prompt}`);
   console.log(
-    `파라미터: ctx=${INFERENCE_PARAMS.n_ctx}, n_predict=${INFERENCE_PARAMS.n_predict}, ` +
-    `temp=${INFERENCE_PARAMS.temperature}, ngl=${INFERENCE_PARAMS.n_gpu_layers_device}`
+    `파라미터: ctx=${CLI_PARAMS.n_ctx}, n_predict=${INFERENCE_PARAMS.n_predict}, ` +
+    `temp=${INFERENCE_PARAMS.temperature}, ngl=${CLI_PARAMS.n_gpu_layers}`
   );
   console.log("---");
 

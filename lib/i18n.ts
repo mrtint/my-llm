@@ -39,6 +39,7 @@ const STRINGS = {
     errorInference: "추론 오류",
     errorEmptyResponse: "모델이 빈 응답을 반환했습니다. 콘솔 로그를 확인해주세요.",
     errorDownload: "다운로드 실패",
+    cancelBtn: "다운로드 취소",
   },
   ja: {
     appTitle: "Vision LLM",
@@ -78,6 +79,7 @@ const STRINGS = {
     errorInference: "推論エラー",
     errorEmptyResponse: "モデルが空の応答を返しました。コンソールログを確認してください。",
     errorDownload: "ダウンロード失敗",
+    cancelBtn: "ダウンロードをキャンセル",
   },
   zh: {
     appTitle: "Vision LLM",
@@ -117,6 +119,7 @@ const STRINGS = {
     errorInference: "推理错误",
     errorEmptyResponse: "模型返回了空回复，请检查控制台日志。",
     errorDownload: "下载失败",
+    cancelBtn: "取消下载",
   },
   en: {
     appTitle: "Vision LLM",
@@ -156,6 +159,7 @@ const STRINGS = {
     errorInference: "Inference Error",
     errorEmptyResponse: "Model returned an empty response. Check console logs for details.",
     errorDownload: "Download failed",
+    cancelBtn: "Cancel Download",
   },
 } as const;
 

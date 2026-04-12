@@ -42,8 +42,10 @@ function AppContent() {
       <DownloadScreen
         modelState={model.modelState}
         downloadStatus={model.downloadStatus}
+        downloadProgress={model.downloadProgress}
         errorMsg={model.errorMsg}
         downloadModels={model.downloadModels}
+        cancelDownload={model.cancelDownload}
       />
     );
   }
@@ -68,7 +70,8 @@ function AppContent() {
                 {(props) => (
                   <DiaryHomeScreen
                     {...props}
-                    contextRef={model.contextRef}
+                    acquireContext={model.acquireContext}
+                    releaseContext={model.releaseContext}
                   />
                 )}
               </DiaryStack.Screen>
@@ -102,10 +105,10 @@ function ChatTabContent({ model }: { model: ReturnType<typeof useModelManager> }
   );
 
   const inference = useInference(
-    model.contextRef,
+    model.acquireContext,
+    model.releaseContext,
     images.imageUris,
     prompt,
-    model.loadModel,
   );
 
   clearResponseRef.current = () => inference.setResponse("");

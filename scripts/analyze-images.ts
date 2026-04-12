@@ -2,7 +2,10 @@
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, writeFileSync, statSync } from "node:fs";
 import { resolve, dirname, basename, extname } from "node:path";
-import { MODEL_FILES, INFERENCE_PARAMS } from "../lib/inference";
+import { totalmem } from "node:os";
+import { MODEL_FILES, INFERENCE_PARAMS, getDeviceParams } from "../lib/inference";
+
+const CLI_PARAMS = getDeviceParams(totalmem());
 import { runInference } from "./cli-inference";
 
 const SCRIPT_DIR = dirname(new URL(import.meta.url).pathname);
@@ -134,8 +137,8 @@ async function main() {
 
     console.log(`=== [${i + 1}/${images.length}] ${name} 분석 중 ===`);
     console.log(
-      `파라미터: ctx=${INFERENCE_PARAMS.n_ctx}, n_predict=${INFERENCE_PARAMS.n_predict}, ` +
-      `temp=${INFERENCE_PARAMS.temperature}, ngl=${INFERENCE_PARAMS.n_gpu_layers_device}`
+      `파라미터: ctx=${CLI_PARAMS.n_ctx}, n_predict=${INFERENCE_PARAMS.n_predict}, ` +
+      `temp=${INFERENCE_PARAMS.temperature}, ngl=${CLI_PARAMS.n_gpu_layers}`
     );
     console.log("---");
 

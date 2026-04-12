@@ -10,13 +10,18 @@ export interface ModelFiles {
 }
 
 export interface InferenceParams {
-  n_ctx: number;
   n_ctx_simulator: number;
   n_predict: number;
   temperature: number;
   stop: string[];
-  n_gpu_layers_device: number;
   n_gpu_layers_simulator: number;
+}
+
+export type DevicePlatform = "ios" | "android" | "unknown";
+
+export interface DeviceParams {
+  n_gpu_layers: number;
+  n_ctx: number;
 }
 
 export interface InferenceResult {
