@@ -1,4 +1,4 @@
-export { MODEL_FILES, INFERENCE_PARAMS } from "./config";
+export { MODEL_FILES, INFERENCE_PARAMS, getDeviceParams, getFallbackParams } from "./config";
 export {
   detectLanguageLabel,
   buildLanguageInstruction,
@@ -8,5 +8,7 @@ export type {
   ModelFileInfo,
   ModelFiles,
   InferenceParams,
+  DeviceParams,
+  DevicePlatform,
   InferenceResult,
 } from "./types";
