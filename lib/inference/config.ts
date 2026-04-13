@@ -2,14 +2,14 @@ import type { ModelFiles, InferenceParams, DeviceParams, DevicePlatform } from "
 
 export const MODEL_FILES: ModelFiles = {
   text: {
-    name: "gemma-4-E2B-it-Q4_K_M.gguf",
-    url: "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf",
-    sizeMB: 2963,
+    name: "gemma-4-E4B-it-Q4_K_M.gguf",
+    url: "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
+    sizeMB: 5090,
   },
   mmproj: {
-    name: "mmproj-gemma-4-E2B-it-bf16.gguf",
-    url: "https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/mmproj-gemma-4-E2B-it-bf16.gguf",
-    sizeMB: 941,
+    name: "mmproj-gemma-4-E4B-it-Q8_0.gguf",
+    url: "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-Q8_0.gguf",
+    sizeMB: 534,
   },
 };
 
