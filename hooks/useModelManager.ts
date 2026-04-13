@@ -260,9 +260,10 @@ export function useModelManager() {
     console.log(`${TAG} androidLib: ${(context as any).androidLib ?? "unknown"}`);
     console.log(`${TAG} devices: ${JSON.stringify((context as any).devices ?? [])}`);
 
-    // 비전 인코더 GPU 가속: OpenCL 드라이버 호환성 문제로 크래시 발생 가능.
-    // S24 Ultra (Adreno 750) 에서도 이미지 청크 GPU 평가 시 SIGABRT 확인됨.
-    // 안정성을 위해 비전 인코더는 CPU에서 실행하고, 텍스트 LLM만 GPU 가속.
+    // 비전 인코더 GPU 가속 테스트 결과:
+    // - Gemma 4: 모든 GPU 백엔드에서 SIGABRT 크래시 (llama.cpp #21402)
+    // - Qwen3-VL: 크래시 없지만 OpenCL 전송 오버헤드로 CPU보다 느림
+    // 결론: CPU가 가장 빠르고 안정적
     const mmUseGpu = false;
     console.log(`${TAG} initMultimodal use_gpu: ${mmUseGpu}`);
     const mmOk = await context.initMultimodal({
