@@ -13,6 +13,7 @@
     "doctor": "npx expo-doctor",
     "test": "jest",
     "check": "npm run typecheck && npm run test",
+    "seed-photos": "xcrun simctl addmedia booted ./test-assets/*.jpg 2>/dev/null || echo 'iOS 시뮬레이터가 실행 중이 아닙니다'",
     "prepare": "husky"
   },
   "dependencies": {

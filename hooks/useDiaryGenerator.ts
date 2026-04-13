@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import type { LlamaContext } from "llama.rn";
 import { buildPhotoPrompt, buildSynthesisPrompt } from "../lib/diary/prompts";
 import { saveDiaryEntry } from "../lib/diary/storage";
+import { collectTodayPhotos } from "../lib/diary/photo-collector";
 import { prepareImageForInference } from "../lib/image";
 import { sortPhotosByTime, type PhotoMeta } from "../lib/photo-meta";
 import { INFERENCE_PARAMS } from "../lib/inference";
@@ -9,11 +10,13 @@ import type { PhotoAnalysis } from "../lib/diary/types";
 
 export type DiaryGenerateStatus =
   | "idle"
+  | "fetching_photos"
   | "loading_model"
   | "analyzing"
   | "synthesizing"
   | "saving"
   | "done"
+  | "no_photos"
   | "error";
 
 function formatElapsed(ms: number): string {
@@ -170,7 +173,41 @@ export function useDiaryGenerator(
     }
   }, []);
 
-  return { generate, reset, status, progress, result, error, elapsedTime };
+  const generateFromToday = useCallback(async () => {
+    setError("");
+    setResult("");
+    setStatus("fetching_photos");
+    setProgress("오늘 사진을 찾는 중...");
+    startTimer();
+
+    try {
+      console.log("[Diary] 오늘 사진 자동 수집 시작");
+      const photos = await collectTodayPhotos(3);
+
+      if (photos.length === 0) {
+        stopTimer();
+        console.log("[Diary] 오늘 사진 없음");
+        setStatus("no_photos");
+        setProgress("");
+        return;
+      }
+
+      console.log(`[Diary] ${photos.length}장 수집 완료:`, photos.map((p) => p.time ?? "unknown"));
+
+      // 사진 수집 후 기존 generate 로직으로 위임
+      // (타이머는 이미 시작됨, status도 이미 전환됨)
+      stopTimer(); // generate가 자체 타이머를 시작하므로 중복 방지
+      await generate(photos);
+    } catch (e: any) {
+      stopTimer();
+      console.error("[Diary] 자동 수집 오류:", e?.message || e);
+      setError(e?.message || "사진 수집에 실패했습니다");
+      setStatus("error");
+      setProgress("");
+    }
+  }, [generate]);
+
+  return { generate, generateFromToday, reset, status, progress, result, error, elapsedTime };
 }
 
 async function runPhotoAnalysis(
