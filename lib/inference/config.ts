@@ -2,14 +2,14 @@ import type { ModelFiles, InferenceParams, DeviceParams, DevicePlatform } from "
 
 export const MODEL_FILES: ModelFiles = {
   text: {
-    name: "gemma-4-E4B-it-Q4_K_M.gguf",
-    url: "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
-    sizeMB: 5090,
+    name: "Qwen3VL-4B-Instruct-Q4_K_M.gguf",
+    url: "https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct-GGUF/resolve/main/Qwen3VL-4B-Instruct-Q4_K_M.gguf",
+    sizeMB: 2382,
   },
   mmproj: {
-    name: "mmproj-gemma-4-E4B-it-Q8_0.gguf",
-    url: "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-Q8_0.gguf",
-    sizeMB: 534,
+    name: "mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf",
+    url: "https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf",
+    sizeMB: 433,
   },
 };
 
@@ -17,7 +17,7 @@ export const INFERENCE_PARAMS: InferenceParams = {
   n_ctx_simulator: 2048,
   n_predict: 1024,
   temperature: 0.2,
-  stop: ["<end_of_turn>"],
+  stop: ["<|im_end|>", "<|endoftext|>"],
   n_gpu_layers_simulator: 0,
 };
 
