@@ -256,10 +256,18 @@ export function useModelManager() {
     });
 
     console.log(`${TAG} initLlama 성공 (${Date.now() - start}ms)`);
+    console.log(`${TAG} GPU: ${context.gpu}, reason: ${context.reasonNoGPU || "N/A"}`);
+    console.log(`${TAG} androidLib: ${(context as any).androidLib ?? "unknown"}`);
+    console.log(`${TAG} devices: ${JSON.stringify((context as any).devices ?? [])}`);
 
+    // 비전 인코더 GPU 가속: OpenCL 드라이버 호환성 문제로 크래시 발생 가능.
+    // S24 Ultra (Adreno 750) 에서도 이미지 청크 GPU 평가 시 SIGABRT 확인됨.
+    // 안정성을 위해 비전 인코더는 CPU에서 실행하고, 텍스트 LLM만 GPU 가속.
+    const mmUseGpu = false;
+    console.log(`${TAG} initMultimodal use_gpu: ${mmUseGpu}`);
     const mmOk = await context.initMultimodal({
       path: mmprojFile.uri,
-      use_gpu: false,
+      use_gpu: mmUseGpu,
     });
 
     if (!mmOk) {
