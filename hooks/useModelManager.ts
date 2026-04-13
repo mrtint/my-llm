@@ -256,10 +256,19 @@ export function useModelManager() {
     });
 
     console.log(`${TAG} initLlama 성공 (${Date.now() - start}ms)`);
+    console.log(`${TAG} GPU: ${context.gpu}, reason: ${context.reasonNoGPU || "N/A"}`);
+    console.log(`${TAG} androidLib: ${(context as any).androidLib ?? "unknown"}`);
+    console.log(`${TAG} devices: ${JSON.stringify((context as any).devices ?? [])}`);
 
+    // 비전 인코더 GPU 가속 테스트 결과:
+    // - Gemma 4: 모든 GPU 백엔드에서 SIGABRT 크래시 (llama.cpp #21402)
+    // - Qwen3-VL: 크래시 없지만 OpenCL 전송 오버헤드로 CPU보다 느림
+    // 결론: CPU가 가장 빠르고 안정적
+    const mmUseGpu = false;
+    console.log(`${TAG} initMultimodal use_gpu: ${mmUseGpu}`);
     const mmOk = await context.initMultimodal({
       path: mmprojFile.uri,
-      use_gpu: false,
+      use_gpu: mmUseGpu,
     });
 
     if (!mmOk) {

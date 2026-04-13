@@ -189,7 +189,7 @@ async function runPhotoAnalysis(
           ],
         },
       ],
-      n_predict: 256,
+      n_predict: 128,
       temperature: INFERENCE_PARAMS.temperature,
       stop: INFERENCE_PARAMS.stop,
       enable_thinking: false,
@@ -210,7 +210,7 @@ async function runTextSynthesis(
   const result = await ctx.completion(
     {
       messages: [{ role: "user", content: prompt }],
-      n_predict: 512,
+      n_predict: 256,
       temperature: 0.7,
       stop: INFERENCE_PARAMS.stop,
       enable_thinking: false,
