@@ -1,6 +1,6 @@
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 
-const MAX_DIMENSION = 1024;
+const MAX_DIMENSION = 512;
 
 /**
  * HEIC/PNG/WebP 등 → JPEG 변환 + 1024px 리사이즈.
