@@ -9,7 +9,7 @@ const MAX_ASSETS = 100;
  * __DEV__ 모드에서는 최근 7일로 범위를 넓혀 시뮬레이터 테스트를 지원한다.
  */
 export async function collectTodayPhotos(maxPhotos = 3): Promise<PhotoMeta[]> {
-  const { status } = await MediaLibrary.requestPermissionsAsync();
+  const { status } = await MediaLibrary.requestPermissionsAsync(false, ["photo"]);
   if (status !== "granted") throw new Error("사진 접근 권한이 필요합니다");
 
   const createdAfter = __DEV__

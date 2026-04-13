@@ -3,7 +3,7 @@ import type { LlamaContext } from "llama.rn";
 import { buildPhotoPrompt, buildSynthesisPrompt } from "../lib/diary/prompts";
 import { saveDiaryEntry } from "../lib/diary/storage";
 import { collectTodayPhotos } from "../lib/diary/photo-collector";
-import { prepareImageForInference } from "../lib/image";
+import { prepareImageForInference, MAX_DIMENSION } from "../lib/image";
 import { sortPhotosByTime, type PhotoMeta } from "../lib/photo-meta";
 import { INFERENCE_PARAMS } from "../lib/inference";
 import type { PhotoAnalysis } from "../lib/diary/types";
@@ -106,7 +106,7 @@ export function useDiaryGenerator(
           });
 
           const processedUri = await prepareImageForInference(photo.uri);
-          console.log(`[Diary] 사진 ${i + 1} 전처리 완료 (JPEG 1024px):`, processedUri.slice(-30));
+          console.log(`[Diary] 사진 ${i + 1} 전처리 완료 (JPEG ${MAX_DIMENSION}px):`, processedUri.slice(-30));
 
           setProgress(`사진 ${i + 1}/${sorted.length} 분석 중...`);
           const time = photo.time ?? fallbackTime;
@@ -150,8 +150,9 @@ export function useDiaryGenerator(
         setProgress("");
       } catch (e: any) {
         stopTimer();
-        console.error("[Diary] 오류 발생:", e?.message || e);
-        setError(e?.message || "일기 생성에 실패했습니다");
+        const msg = e?.message || String(e) || "일기 생성에 실패했습니다";
+        console.error("[Diary] 오류 발생:", msg);
+        setError(msg);
         setStatus("error");
         setProgress("");
       } finally {
@@ -200,8 +201,9 @@ export function useDiaryGenerator(
       await generate(photos);
     } catch (e: any) {
       stopTimer();
-      console.error("[Diary] 자동 수집 오류:", e?.message || e);
-      setError(e?.message || "사진 수집에 실패했습니다");
+      const msg = e?.message || String(e) || "사진 수집에 실패했습니다";
+      console.error("[Diary] 자동 수집 오류:", msg);
+      setError(msg);
       setStatus("error");
       setProgress("");
     }

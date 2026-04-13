@@ -122,8 +122,8 @@ export function DiaryHomeScreen({
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* 오늘 일기가 아직 없을 때: 자동/수동 생성 UI */}
-        {!todayEntry && !isGenerating && diary.status !== "done" && (
+        {/* 자동/수동 생성 UI */}
+        {!isGenerating && diary.status !== "done" && (
           <View style={styles.section}>
             {/* 사진 없음 상태 */}
             {diary.status === "no_photos" && (
