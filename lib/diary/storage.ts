@@ -53,6 +53,11 @@ export async function getDiaryEntries(): Promise<DiaryEntry[]> {
   }));
 }
 
+export async function deleteDiaryEntry(date: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(`DELETE FROM diary_entries WHERE date = ?`, date);
+}
+
 export async function getDiaryEntry(date: string): Promise<DiaryEntry | null> {
   const database = await getDb();
   const row = await database.getFirstAsync<{

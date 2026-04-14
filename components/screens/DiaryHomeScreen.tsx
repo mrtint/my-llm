@@ -8,6 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -36,15 +37,34 @@ export function DiaryHomeScreen({
   releaseContext,
   navigation,
 }: DiaryHomeScreenProps) {
-  useDailyNotification();
-
   const todayStr = new Date().toISOString().split("T")[0];
   const [todayEntry, setTodayEntry] = useState<DiaryEntry | null>(null);
   const [pastEntries, setPastEntries] = useState<DiaryEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<PhotoMeta[]>([]);
+  const [manualMode, setManualMode] = useState(false);
 
   const diary = useDiaryGenerator(acquireContext, releaseContext);
+
+  const confirmAndGenerate = useCallback(() => {
+    if (todayEntry) {
+      Alert.alert(
+        "일기 다시 작성",
+        "오늘 적은 일기가 이미 있는데요?\n정말 다시 작성할까요?",
+        [
+          { text: "아니오", style: "cancel" },
+          { text: "네", onPress: () => diary.generateFromToday() },
+        ],
+      );
+    } else {
+      diary.generateFromToday();
+    }
+  }, [todayEntry, diary.generateFromToday]);
+
+  // 알림 탭 → 자동 생성 트리거
+  useDailyNotification(() => {
+    confirmAndGenerate();
+  });
 
   const loadEntries = useCallback(async () => {
     const all = await getDiaryEntries();
@@ -61,6 +81,7 @@ export function DiaryHomeScreen({
     if (diary.status === "done") {
       loadEntries();
       setSelectedPhotos([]);
+      setManualMode(false);
     }
   }, [diary.status, loadEntries]);
 
@@ -96,7 +117,9 @@ export function DiaryHomeScreen({
     setSelectedPhotos((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const isGenerating = !["idle", "done", "error"].includes(diary.status);
+  const isGenerating = ![
+    "idle", "done", "error", "no_photos", "paused",
+  ].includes(diary.status);
   const canGenerate = selectedPhotos.length > 0 && !isGenerating;
 
   return (
@@ -113,59 +136,128 @@ export function DiaryHomeScreen({
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* 사진 선택 영역 */}
+        {/* 자동/수동 생성 UI */}
         {!isGenerating && diary.status !== "done" && (
           <View style={styles.section}>
-            <View style={styles.photoRow}>
-              {selectedPhotos.map((photo, i) => (
-                <View key={i} style={styles.photoThumbWrap}>
-                  <Image source={{ uri: photo.uri }} style={styles.photoThumb} resizeMode="cover" />
-                  <TouchableOpacity
-                    style={styles.removeBtn}
-                    onPress={() => removePhoto(i)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={styles.removeBtnText}>✕</Text>
-                  </TouchableOpacity>
-                  {photo.time && (
-                    <Text style={styles.photoMetaLabel}>{photo.time}</Text>
-                  )}
-                </View>
-              ))}
-              {selectedPhotos.length < MAX_PHOTOS && (
-                <TouchableOpacity style={styles.addPhotoBtn} onPress={pickPhotos}>
-                  <Text style={styles.addPhotoBtnIcon}>+</Text>
-                  <Text style={styles.addPhotoBtnLabel}>
-                    {selectedPhotos.length === 0
-                      ? t.diaryGenerate
-                      : `${selectedPhotos.length}/${MAX_PHOTOS}`}
-                  </Text>
+            {/* 사진 없음 상태 */}
+            {diary.status === "no_photos" && (
+              <View style={styles.noPhotosBox}>
+                <Text style={styles.noPhotosText}>
+                  {t.diaryNoPhotos}{"\n"}내일 다시 알려드릴게요
+                </Text>
+                <TouchableOpacity
+                  style={styles.manualModeBtn}
+                  onPress={() => { diary.reset(); setManualMode(true); }}
+                >
+                  <Text style={styles.manualModeBtnText}>사진 직접 선택</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-
-            {selectedPhotos.length > 0 && (
-              <TouchableOpacity
-                style={[styles.generateBtn, !canGenerate && styles.generateBtnDisabled]}
-                onPress={() => diary.generate(selectedPhotos)}
-                disabled={!canGenerate}
-              >
-                <Text style={styles.generateBtnText}>{t.diaryGenerating}</Text>
-              </TouchableOpacity>
+              </View>
             )}
 
+            {/* 에러 상태 */}
             {diary.status === "error" && (
               <View style={styles.errorBox}>
                 <Text style={styles.errorTitle}>{t.diaryError}</Text>
                 <Text style={styles.errorMsg}>{diary.error}</Text>
                 <TouchableOpacity
                   style={styles.retryBtn}
-                  onPress={() => {
-                    diary.reset();
-                  }}
+                  onPress={diary.reset}
                 >
                   <Text style={styles.retryBtnText}>{t.diaryRetry}</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* 중단된 생성 재개 버튼 */}
+            {diary.status === "paused" && diary.hasCheckpoint && (
+              <View>
+                <TouchableOpacity
+                  style={styles.resumeBtn}
+                  onPress={diary.resumeFromCheckpoint}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.resumeBtnTitle}>이어서 생성하기</Text>
+                  <Text style={styles.resumeBtnDesc}>이전에 중단된 일기 생성을 이어서 진행합니다</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.restartBtn}
+                  onPress={diary.reset}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.restartBtnTitle}>새로 다시 생성하기</Text>
+                  <Text style={styles.restartBtnDesc}>이전 진행 내용을 버리고 처음부터 생성합니다</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* 자동 생성 버튼 (기본 모드) */}
+            {diary.status === "idle" && !manualMode && (
+              <View>
+                <TouchableOpacity
+                  style={styles.autoGenerateBtn}
+                  onPress={confirmAndGenerate}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.autoGenerateTitle}>{t.diaryAutoGenerate}</Text>
+                  <Text style={styles.autoGenerateDesc}>{t.diaryAutoGenerateDesc}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.manualModeBtn}
+                  onPress={() => setManualMode(true)}
+                >
+                  <Text style={styles.manualModeBtnText}>사진 직접 선택</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* 수동 사진 선택 모드 */}
+            {diary.status === "idle" && manualMode && (
+              <View>
+                <TouchableOpacity
+                  style={styles.backToAutoBtn}
+                  onPress={() => { setManualMode(false); setSelectedPhotos([]); }}
+                >
+                  <Text style={styles.backToAutoBtnText}>← 자동 생성</Text>
+                </TouchableOpacity>
+
+                <View style={styles.photoRow}>
+                  {selectedPhotos.map((photo, i) => (
+                    <View key={i} style={styles.photoThumbWrap}>
+                      <Image source={{ uri: photo.uri }} style={styles.photoThumb} resizeMode="cover" />
+                      <TouchableOpacity
+                        style={styles.removeBtn}
+                        onPress={() => removePhoto(i)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.removeBtnText}>✕</Text>
+                      </TouchableOpacity>
+                      {photo.time && (
+                        <Text style={styles.photoMetaLabel}>{photo.time}</Text>
+                      )}
+                    </View>
+                  ))}
+                  {selectedPhotos.length < MAX_PHOTOS && (
+                    <TouchableOpacity style={styles.addPhotoBtn} onPress={pickPhotos}>
+                      <Text style={styles.addPhotoBtnIcon}>+</Text>
+                      <Text style={styles.addPhotoBtnLabel}>
+                        {selectedPhotos.length === 0
+                          ? t.diaryGenerate
+                          : `${selectedPhotos.length}/${MAX_PHOTOS}`}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {selectedPhotos.length > 0 && (
+                  <TouchableOpacity
+                    style={[styles.generateBtn, !canGenerate && styles.generateBtnDisabled]}
+                    onPress={() => diary.generate(selectedPhotos)}
+                    disabled={!canGenerate}
+                  >
+                    <Text style={styles.generateBtnText}>{t.diaryGenerating}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
@@ -224,13 +316,71 @@ export function DiaryHomeScreen({
           </View>
         )}
 
-        {todayEntry === null && pastEntries.length === 0 && !isGenerating && (
+        {todayEntry === null && pastEntries.length === 0 && !isGenerating && diary.status === "idle" && !manualMode && (
           <Text style={styles.emptyText}>{t.diaryEmpty}</Text>
         )}
+
+        {/* 디버그 패널 (__DEV__ only) */}
+        {__DEV__ && <DebugPanel />}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+function DebugPanel() {
+  const [debugLog, setDebugLog] = useState("");
+
+  const onTriggerNotif = async () => {
+    setDebugLog("알림 발송 중...");
+    const { triggerDiaryNotificationNow } = await import("../../lib/diary/debug-trigger");
+    await triggerDiaryNotificationNow();
+    setDebugLog("알림 발송됨");
+  };
+
+  const onSchedule1min = async () => {
+    setDebugLog("1분 후 스케줄 중...");
+    const { rescheduleDiaryNotification } = await import("../../lib/diary/debug-trigger");
+    await rescheduleDiaryNotification(1);
+    setDebugLog("1분 후 스케줄됨");
+  };
+
+  return (
+    <View style={debugStyles.container}>
+      <Text style={debugStyles.title}>Debug</Text>
+      <View style={debugStyles.row}>
+        <TouchableOpacity style={debugStyles.btn} onPress={onTriggerNotif}>
+          <Text style={debugStyles.btnText}>테스트 알림</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={debugStyles.btn} onPress={onSchedule1min}>
+          <Text style={debugStyles.btnText}>1분 후</Text>
+        </TouchableOpacity>
+      </View>
+      {debugLog !== "" && <Text style={debugStyles.log}>{debugLog}</Text>}
+    </View>
+  );
+}
+
+const debugStyles = StyleSheet.create({
+  container: {
+    marginTop: 32,
+    padding: 12,
+    backgroundColor: "#fef3c7",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#f59e0b",
+  },
+  title: { fontSize: 12, fontWeight: "700", color: "#92400e", marginBottom: 8 },
+  row: { flexDirection: "row", gap: 8 },
+  btn: {
+    flex: 1,
+    backgroundColor: "#f59e0b",
+    borderRadius: 6,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  btnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  log: { fontSize: 11, color: "#92400e", marginTop: 6 },
+});
 
 const THUMB_SIZE = 90;
 
@@ -254,6 +404,48 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  autoGenerateBtn: {
+    backgroundColor: "#4a90d9",
+    borderRadius: 14,
+    padding: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  autoGenerateTitle: { color: "#fff", fontSize: 17, fontWeight: "700" },
+  autoGenerateDesc: { color: "rgba(255,255,255,0.8)", fontSize: 13, marginTop: 6 },
+  manualModeBtn: {
+    alignSelf: "center",
+    marginTop: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  manualModeBtnText: { color: "#888", fontSize: 14 },
+  backToAutoBtn: {
+    marginBottom: 12,
+    paddingVertical: 4,
+  },
+  backToAutoBtnText: { color: "#4a90d9", fontSize: 14, fontWeight: "500" },
+  noPhotosBox: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 28,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  noPhotosText: {
+    fontSize: 15,
+    color: "#888",
+    textAlign: "center",
+    lineHeight: 24,
   },
   photoRow: {
     flexDirection: "row",
@@ -339,7 +531,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#fcc",
-    marginTop: 8,
   },
   errorTitle: { fontSize: 15, fontWeight: "600", color: "#c00", marginBottom: 4 },
   errorMsg: { fontSize: 14, color: "#666", marginBottom: 12 },
@@ -364,4 +555,26 @@ const styles = StyleSheet.create({
   todayContent: { fontSize: 16, color: "#222", lineHeight: 26 },
   readMore: { fontSize: 13, color: "#4a90d9", marginTop: 10, fontWeight: "500" },
   emptyText: { textAlign: "center", color: "#bbb", fontSize: 15, marginTop: 40 },
+  resumeBtn: {
+    backgroundColor: "#f0f7ff",
+    borderRadius: 14,
+    padding: 20,
+    alignItems: "center",
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#bdd8f5",
+  },
+  resumeBtnTitle: { fontSize: 16, fontWeight: "700", color: "#4a90d9" },
+  resumeBtnDesc: { fontSize: 13, color: "#7aabe0", marginTop: 4 },
+  restartBtn: {
+    backgroundColor: "#fff5f5",
+    borderRadius: 14,
+    padding: 20,
+    alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#fcc",
+  },
+  restartBtnTitle: { fontSize: 16, fontWeight: "700", color: "#c00" },
+  restartBtnDesc: { fontSize: 13, color: "#e08080", marginTop: 4 },
 });

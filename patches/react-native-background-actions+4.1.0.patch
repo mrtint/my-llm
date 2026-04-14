@@ -1,0 +1,22 @@
+diff --git a/node_modules/react-native-background-actions/android/src/main/java/com/asterinet/react/bgactions/RNBackgroundActionsTask.java b/node_modules/react-native-background-actions/android/src/main/java/com/asterinet/react/bgactions/RNBackgroundActionsTask.java
+index 963b788..d06b67e 100644
+--- a/node_modules/react-native-background-actions/android/src/main/java/com/asterinet/react/bgactions/RNBackgroundActionsTask.java
++++ b/node_modules/react-native-background-actions/android/src/main/java/com/asterinet/react/bgactions/RNBackgroundActionsTask.java
+@@ -59,7 +59,7 @@ final public class RNBackgroundActionsTask extends HeadlessJsTaskService {
+                 .setSmallIcon(iconInt)
+                 .setContentIntent(contentIntent)
+                 .setOngoing(true)
+-                .setPriority(NotificationCompat.PRIORITY_MIN)
++                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                 .setColor(color);
+ 
+         final Bundle progressBarBundle = bgOptions.getProgressBar();
+@@ -130,7 +130,7 @@ final public class RNBackgroundActionsTask extends HeadlessJsTaskService {
+ 
+     private void createNotificationChannel(@NonNull final String taskTitle, @NonNull final String taskDesc) {
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+-            final int importance = NotificationManager.IMPORTANCE_LOW;
++            final int importance = NotificationManager.IMPORTANCE_HIGH;
+             final NotificationChannel channel = new NotificationChannel(CHANNEL_ID, taskTitle, importance);
+             channel.setDescription(taskDesc);
+             final NotificationManager notificationManager = getSystemService(NotificationManager.class);
