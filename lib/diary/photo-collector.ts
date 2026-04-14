@@ -6,7 +6,7 @@ const MAX_ASSETS = 100;
 
 /**
  * 오늘 찍은 사진을 자동 수집하고 시간대별 대표 사진을 선택한다.
- * __DEV__ 모드에서는 최근 7일로 범위를 넓혀 시뮬레이터 테스트를 지원한다.
+ * __DEV__ 모드에서는 날짜 제한 없이 가장 최근 사진 순으로 가져온다.
  */
 export async function collectTodayPhotos(maxPhotos = 3): Promise<PhotoMeta[]> {
   const perm = await MediaLibrary.requestPermissionsAsync();
@@ -19,18 +19,41 @@ export async function collectTodayPhotos(maxPhotos = 3): Promise<PhotoMeta[]> {
     await MediaLibrary.presentPermissionsPickerAsync();
   }
 
-  const createdAfter = __DEV__
-    ? Date.now() - 7 * 24 * 60 * 60 * 1000  // 개발: 최근 7일
-    : getStartOfToday();                      // 프로덕션: 오늘 0시
+  const queryOptions: MediaLibrary.AssetsOptions = __DEV__
+    ? {
+        // 개발: 날짜 무관, 최근 사진 순으로 maxPhotos장만 가져옴
+        mediaType: "photo",
+        sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+        first: maxPhotos,
+      }
+    : {
+        // 프로덕션: 오늘 0시 이후 사진
+        mediaType: "photo",
+        createdAfter: getStartOfToday(),
+        sortBy: MediaLibrary.SortBy.creationTime,
+        first: MAX_ASSETS,
+      };
 
-  const { assets } = await MediaLibrary.getAssetsAsync({
-    mediaType: "photo",
-    createdAfter,
-    sortBy: MediaLibrary.SortBy.creationTime,
-    first: MAX_ASSETS,
-  });
+  const { assets } = await MediaLibrary.getAssetsAsync(queryOptions);
+
+  if (__DEV__) {
+    console.log(
+      `[PhotoCollector] ⚠️ DEV 모드 — 날짜 무관 최근 ${maxPhotos}장 사용`,
+    );
+  }
 
   if (assets.length === 0) return [];
+
+  // 개발 모드: 이미 최근 순으로 maxPhotos장 가져왔으므로 바로 사용
+  if (__DEV__) {
+    const metas = await Promise.all(assets.map((a) => extractMetaFromAsset(a)));
+    metas.forEach((m, i) => {
+      console.log(
+        `[PhotoCollector] 사진 ${i + 1}: date=${m.date} time=${m.time ?? "-"} place=${m.place ?? "-"} uri=...${m.uri.slice(-20)}`,
+      );
+    });
+    return sortPhotosByTime(metas);
+  }
 
   const clusters = clusterByTimePeriod(assets);
   const selected = selectRepresentative(clusters, maxPhotos) as MediaLibrary.Asset[];
@@ -38,6 +61,11 @@ export async function collectTodayPhotos(maxPhotos = 3): Promise<PhotoMeta[]> {
   const metas = await Promise.all(
     selected.map((asset) => extractMetaFromAsset(asset)),
   );
+  metas.forEach((m, i) => {
+    console.log(
+      `[PhotoCollector] 사진 ${i + 1}: date=${m.date} time=${m.time ?? "-"} place=${m.place ?? "-"} uri=...${m.uri.slice(-20)}`,
+    );
+  });
   return sortPhotosByTime(metas);
 }
 
@@ -59,7 +87,7 @@ export function clusterByTimePeriod(
   const evening: typeof assets = [];
 
   for (const a of assets) {
-    const hour = new Date(a.creationTime * 1000).getHours();
+    const hour = new Date(a.creationTime).getHours();
     if (hour < 12) morning.push(a);
     else if (hour < 18) afternoon.push(a);
     else evening.push(a);
@@ -91,7 +119,8 @@ export function selectRepresentative<T>(
 async function extractMetaFromAsset(
   asset: MediaLibrary.Asset,
 ): Promise<PhotoMeta> {
-  const created = new Date(asset.creationTime * 1000);
+  // creationTime은 Android에서 ms 단위 (DATE_TAKEN)
+  const created = new Date(asset.creationTime);
   const meta: PhotoMeta = {
     uri: asset.uri,
     timestamp: created.getTime(),
@@ -107,6 +136,7 @@ async function extractMetaFromAsset(
 
   try {
     const info = await MediaLibrary.getAssetInfoAsync(asset.id);
+    console.log(`[PhotoCollector] assetInfo id=${asset.id} location=${JSON.stringify(info.location ?? null)} exif keys=${Object.keys(info.exif ?? {}).slice(0, 5).join(",")}`);
     if (info.localUri) {
       meta.uri = info.localUri;
     }
@@ -139,12 +169,14 @@ async function reverseGeocode(
       latitude: lat,
       longitude: lon,
     });
+    console.log(`[PhotoCollector] reverseGeocode (${lat.toFixed(4)}, ${lon.toFixed(4)}) → ${JSON.stringify(results[0] ?? null)}`);
     if (results.length === 0) return null;
     const r = results[0];
     return (
       [r.district, r.subregion, r.region].filter(Boolean).join(" ") || null
     );
-  } catch {
+  } catch (e) {
+    console.warn(`[PhotoCollector] reverseGeocode 실패:`, e);
     return null;
   }
 }

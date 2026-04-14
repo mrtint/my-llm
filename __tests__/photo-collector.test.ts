@@ -3,10 +3,10 @@ import {
   selectRepresentative,
 } from "../lib/diary/photo-collector";
 
-/** creationTime은 MediaLibrary 형식: Unix seconds (ms/1000) */
+/** creationTime은 MediaLibrary 형식: Unix ms (Android DATE_TAKEN) */
 function makeAsset(hour: number, minute = 0) {
   const d = new Date(2026, 3, 13, hour, minute);
-  return { creationTime: d.getTime() / 1000 };
+  return { creationTime: d.getTime() };
 }
 
 describe("clusterByTimePeriod", () => {

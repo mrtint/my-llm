@@ -170,14 +170,24 @@ export function DiaryHomeScreen({
 
             {/* 중단된 생성 재개 버튼 */}
             {diary.status === "paused" && diary.hasCheckpoint && (
-              <TouchableOpacity
-                style={styles.resumeBtn}
-                onPress={diary.resumeFromCheckpoint}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.resumeBtnTitle}>이어서 생성하기</Text>
-                <Text style={styles.resumeBtnDesc}>이전에 중단된 일기 생성을 이어서 진행합니다</Text>
-              </TouchableOpacity>
+              <View>
+                <TouchableOpacity
+                  style={styles.resumeBtn}
+                  onPress={diary.resumeFromCheckpoint}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.resumeBtnTitle}>이어서 생성하기</Text>
+                  <Text style={styles.resumeBtnDesc}>이전에 중단된 일기 생성을 이어서 진행합니다</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.restartBtn}
+                  onPress={diary.reset}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.restartBtnTitle}>새로 다시 생성하기</Text>
+                  <Text style={styles.restartBtnDesc}>이전 진행 내용을 버리고 처음부터 생성합니다</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* 자동 생성 버튼 (기본 모드) */}
@@ -550,10 +560,21 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 20,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: "#bdd8f5",
   },
   resumeBtnTitle: { fontSize: 16, fontWeight: "700", color: "#4a90d9" },
   resumeBtnDesc: { fontSize: 13, color: "#7aabe0", marginTop: 4 },
+  restartBtn: {
+    backgroundColor: "#fff5f5",
+    borderRadius: 14,
+    padding: 20,
+    alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#fcc",
+  },
+  restartBtnTitle: { fontSize: 16, fontWeight: "700", color: "#c00" },
+  restartBtnDesc: { fontSize: 13, color: "#e08080", marginTop: 4 },
 });
