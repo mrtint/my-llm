@@ -11,6 +11,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
+export const DIARY_TRIGGER_TYPE = "diary-trigger";
+
 export async function scheduleDailyDiaryNotification(
   hour = 21,
   minute = 0,
@@ -23,6 +25,7 @@ export async function scheduleDailyDiaryNotification(
     content: {
       title: "오늘의 일기",
       body: "오늘 하루를 기록할 준비가 됐어요 📔",
+      data: { type: DIARY_TRIGGER_TYPE },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -34,7 +37,7 @@ export async function scheduleDailyDiaryNotification(
 
 /**
  * 매일 알림 스케줄링 + 알림 탭 콜백 등록.
- * onNotificationTapped가 호출되면 자동 일기 생성을 시작할 수 있다.
+ * 알림 탭 시 onNotificationTapped가 호출되어 포그라운드에서 자동 생성을 시작한다.
  */
 export function useDailyNotification(onNotificationTapped?: () => void) {
   const callbackRef = useRef(onNotificationTapped);

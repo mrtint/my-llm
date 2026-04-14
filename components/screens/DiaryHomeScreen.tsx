@@ -8,6 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -45,11 +46,24 @@ export function DiaryHomeScreen({
 
   const diary = useDiaryGenerator(acquireContext, releaseContext);
 
-  // 알림 탭 → 자동 생성 트리거
-  useDailyNotification(() => {
-    if (!todayEntry) {
+  const confirmAndGenerate = useCallback(() => {
+    if (todayEntry) {
+      Alert.alert(
+        "일기 다시 작성",
+        "오늘 적은 일기가 이미 있는데요?\n정말 다시 작성할까요?",
+        [
+          { text: "아니오", style: "cancel" },
+          { text: "네", onPress: () => diary.generateFromToday() },
+        ],
+      );
+    } else {
       diary.generateFromToday();
     }
+  }, [todayEntry, diary.generateFromToday]);
+
+  // 알림 탭 → 자동 생성 트리거
+  useDailyNotification(() => {
+    confirmAndGenerate();
   });
 
   const loadEntries = useCallback(async () => {
@@ -104,7 +118,7 @@ export function DiaryHomeScreen({
   }, []);
 
   const isGenerating = ![
-    "idle", "done", "error", "no_photos",
+    "idle", "done", "error", "no_photos", "paused",
   ].includes(diary.status);
   const canGenerate = selectedPhotos.length > 0 && !isGenerating;
 
@@ -154,12 +168,24 @@ export function DiaryHomeScreen({
               </View>
             )}
 
+            {/* 중단된 생성 재개 버튼 */}
+            {diary.status === "paused" && diary.hasCheckpoint && (
+              <TouchableOpacity
+                style={styles.resumeBtn}
+                onPress={diary.resumeFromCheckpoint}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.resumeBtnTitle}>이어서 생성하기</Text>
+                <Text style={styles.resumeBtnDesc}>이전에 중단된 일기 생성을 이어서 진행합니다</Text>
+              </TouchableOpacity>
+            )}
+
             {/* 자동 생성 버튼 (기본 모드) */}
             {diary.status === "idle" && !manualMode && (
               <View>
                 <TouchableOpacity
                   style={styles.autoGenerateBtn}
-                  onPress={diary.generateFromToday}
+                  onPress={confirmAndGenerate}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.autoGenerateTitle}>{t.diaryAutoGenerate}</Text>
@@ -283,10 +309,68 @@ export function DiaryHomeScreen({
         {todayEntry === null && pastEntries.length === 0 && !isGenerating && diary.status === "idle" && !manualMode && (
           <Text style={styles.emptyText}>{t.diaryEmpty}</Text>
         )}
+
+        {/* 디버그 패널 (__DEV__ only) */}
+        {__DEV__ && <DebugPanel />}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+function DebugPanel() {
+  const [debugLog, setDebugLog] = useState("");
+
+  const onTriggerNotif = async () => {
+    setDebugLog("알림 발송 중...");
+    const { triggerDiaryNotificationNow } = await import("../../lib/diary/debug-trigger");
+    await triggerDiaryNotificationNow();
+    setDebugLog("알림 발송됨");
+  };
+
+  const onSchedule1min = async () => {
+    setDebugLog("1분 후 스케줄 중...");
+    const { rescheduleDiaryNotification } = await import("../../lib/diary/debug-trigger");
+    await rescheduleDiaryNotification(1);
+    setDebugLog("1분 후 스케줄됨");
+  };
+
+  return (
+    <View style={debugStyles.container}>
+      <Text style={debugStyles.title}>Debug</Text>
+      <View style={debugStyles.row}>
+        <TouchableOpacity style={debugStyles.btn} onPress={onTriggerNotif}>
+          <Text style={debugStyles.btnText}>테스트 알림</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={debugStyles.btn} onPress={onSchedule1min}>
+          <Text style={debugStyles.btnText}>1분 후</Text>
+        </TouchableOpacity>
+      </View>
+      {debugLog !== "" && <Text style={debugStyles.log}>{debugLog}</Text>}
+    </View>
+  );
+}
+
+const debugStyles = StyleSheet.create({
+  container: {
+    marginTop: 32,
+    padding: 12,
+    backgroundColor: "#fef3c7",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#f59e0b",
+  },
+  title: { fontSize: 12, fontWeight: "700", color: "#92400e", marginBottom: 8 },
+  row: { flexDirection: "row", gap: 8 },
+  btn: {
+    flex: 1,
+    backgroundColor: "#f59e0b",
+    borderRadius: 6,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  btnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  log: { fontSize: 11, color: "#92400e", marginTop: 6 },
+});
 
 const THUMB_SIZE = 90;
 
@@ -461,4 +545,15 @@ const styles = StyleSheet.create({
   todayContent: { fontSize: 16, color: "#222", lineHeight: 26 },
   readMore: { fontSize: 13, color: "#4a90d9", marginTop: 10, fontWeight: "500" },
   emptyText: { textAlign: "center", color: "#bbb", fontSize: 15, marginTop: 40 },
+  resumeBtn: {
+    backgroundColor: "#f0f7ff",
+    borderRadius: 14,
+    padding: 20,
+    alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#bdd8f5",
+  },
+  resumeBtnTitle: { fontSize: 16, fontWeight: "700", color: "#4a90d9" },
+  resumeBtnDesc: { fontSize: 13, color: "#7aabe0", marginTop: 4 },
 });
