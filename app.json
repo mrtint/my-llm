@@ -50,7 +50,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "일기 생성을 위해 오늘 찍은 사진에 접근합니다."
+          "photosPermission": "일기 생성을 위해 오늘 찍은 사진에 접근합니다.",
+          "isAccessMediaLocationEnabled": true
         }
       ],
       [
